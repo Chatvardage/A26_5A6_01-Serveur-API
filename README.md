@@ -24,6 +24,8 @@ Base de données : PostgreSQL
 ORM :
 - Prisma pour les services NestJS
 - SQLx pour le service Rust
-Admin : React + TypeScript + Vite
+- 
+Admin : AdminJS
+
 Conteneurisation : Docker + Docker Compose
 Documentation API : Swagger / OpenAPI
