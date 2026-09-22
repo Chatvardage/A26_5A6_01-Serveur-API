@@ -79,6 +79,12 @@ Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `
 - `private-message.updated`
 - `private-message.deleted`
 
+## CORS et en-têtes de cache
+
+Le Gateway applique une liste blanche exacte via `CORS_ORIGINS`. Les en-têtes `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` et `Access-Control-Max-Age` sont ajoutés uniquement lorsque l’en-tête `Origin` reçu est autorisé.
+
+Les en-têtes CORS fournis par un microservice amont sont supprimés afin que le Gateway reste l’unique autorité CORS. En revanche, un en-tête amont `Vary` est préservé et fusionné avec `Origin` lorsqu’une requête contient cet en-tête, afin de conserver les dimensions de cache telles que `Cookie` ou `Accept-Encoding`.
+
 ## Health
 
 ### GET `/api/health`

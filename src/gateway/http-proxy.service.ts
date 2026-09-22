@@ -316,11 +316,16 @@ export class HttpProxyService {
         UPSTREAM_CORS_HEADERS.has(lowerName) ||
         lowerName === 'content-length' ||
         lowerName === 'content-encoding' ||
-        lowerName === 'set-cookie' ||
-        lowerName === 'vary'
+        lowerName === 'set-cookie'
       ) {
         return;
       }
+
+      if (lowerName === 'vary') {
+        this.mergeVaryHeader(response, value);
+        return;
+      }
+
       response.setHeader(name, value);
     });
 
@@ -364,10 +369,12 @@ export class HttpProxyService {
       return;
     }
 
-    response.setHeader('Vary', 'Origin');
-    if (this.allowedOrigins.has(origin)) {
-      response.setHeader('Access-Control-Allow-Origin', origin);
+    this.mergeVaryHeader(response, 'Origin');
+    if (!this.allowedOrigins.has(origin)) {
+      return;
     }
+
+    response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader(
       'Access-Control-Allow-Methods',
       'GET,POST,PATCH,DELETE,OPTIONS',
@@ -377,6 +384,16 @@ export class HttpProxyService {
       'Authorization,Content-Type',
     );
     response.setHeader('Access-Control-Max-Age', '600');
+  }
+
+  private mergeVaryHeader(response: Response, value: string): void {
+    const current = String(response.getHeader('Vary') ?? '');
+    const values = `${current},${value}`
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const unique = new Map(values.map((entry) => [entry.toLowerCase(), entry]));
+    response.setHeader('Vary', [...unique.values()].join(', '));
   }
 
   private clientKey(request: Request): string {

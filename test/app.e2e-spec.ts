@@ -86,7 +86,17 @@ describe('Serveur-API (e2e)', () => {
   let userConfig: MockUpstream;
   let app: INestApplication;
   let gatewayUrl: string;
-  const previousEnv = { ...process.env };
+  const envNames = [
+    'AUTH_SERVICE_URL',
+    'ROOM_SERVICE_URL',
+    'MESSAGE_SERVICE_URL',
+    'USER_CONFIG_SERVICE_URL',
+    'AUTH_RATE_LIMIT_MAX',
+    'CORS_ORIGINS',
+  ] as const;
+  const previousEnv = Object.fromEntries(
+    envNames.map((name) => [name, process.env[name]]),
+  );
 
   beforeAll(async () => {
     auth = await mockUpstream(async (request, response) => {
@@ -195,7 +205,14 @@ describe('Serveur-API (e2e)', () => {
       message.close(),
       userConfig.close(),
     ]);
-    process.env = previousEnv;
+    for (const name of envNames) {
+      const value = previousEnv[name];
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
   });
 
   it('exposes its own liveness and upstream readiness', async () => {

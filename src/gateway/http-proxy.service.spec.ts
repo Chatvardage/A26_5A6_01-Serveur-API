@@ -170,25 +170,41 @@ describe('HttpProxyService', () => {
     expect(state.headers.get('access-control-max-age')).toBe('600');
   });
 
-  it('does not reflect a disallowed or missing origin', async () => {
+  it('does not emit CORS allow headers for a disallowed origin', async () => {
     const service = new HttpProxyService(config(), {
       consume: jest.fn(),
     } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
 
-    for (const headers of [{ origin: 'https://evil.example' }, {}]) {
-      const { response: res, state } = response();
-      await service.handle(
-        request({ url: '/unknown', headers }),
-        res,
-        jest.fn(),
-      );
-      expect(state.headers.has('access-control-allow-origin')).toBe(false);
-      if (!('origin' in headers)) {
-        expect(state.headers.has('access-control-allow-methods')).toBe(false);
-        expect(state.headers.has('access-control-allow-headers')).toBe(false);
-        expect(state.headers.has('access-control-max-age')).toBe(false);
-      }
-    }
+    await service.handle(
+      request({
+        url: '/unknown',
+        headers: { origin: 'https://evil.example' },
+      }),
+      res,
+      jest.fn(),
+    );
+
+    expect(state.headers.has('access-control-allow-origin')).toBe(false);
+    expect(state.headers.has('access-control-allow-methods')).toBe(false);
+    expect(state.headers.has('access-control-allow-headers')).toBe(false);
+    expect(state.headers.has('access-control-max-age')).toBe(false);
+    expect(state.headers.get('vary')).toBe('Origin');
+  });
+
+  it('does not emit CORS headers when Origin is missing', async () => {
+    const service = new HttpProxyService(config(), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
+
+    await service.handle(request({ url: '/unknown' }), res, jest.fn());
+
+    expect(state.headers.has('access-control-allow-origin')).toBe(false);
+    expect(state.headers.has('access-control-allow-methods')).toBe(false);
+    expect(state.headers.has('access-control-allow-headers')).toBe(false);
+    expect(state.headers.has('access-control-max-age')).toBe(false);
+    expect(state.headers.has('vary')).toBe(false);
   });
 
   it('answers upstream CORS preflight locally', async () => {
@@ -345,9 +361,50 @@ describe('HttpProxyService', () => {
     );
     expect(state.headers.has('content-encoding')).toBe(false);
     expect(state.headers.has('content-length')).toBe(false);
-    expect(state.headers.get('vary')).toBe('Origin');
+    expect(state.headers.get('vary')).toBe('Origin, Accept-Encoding');
     expect(state.headers.get('set-cookie')).toBeDefined();
     expect(state.body?.toString()).toBe('{"jeton":"jwt"}');
+  });
+
+  it('preserves an upstream Vary header when no CORS origin is present', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('ok', {
+        status: 200,
+        headers: { vary: 'Cookie, Accept-Encoding' },
+      }),
+    );
+    const service = new HttpProxyService(config(), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
+
+    await service.handle(request({ url: '/api/messages' }), res, jest.fn());
+
+    expect(state.headers.get('vary')).toBe('Cookie, Accept-Encoding');
+  });
+
+  it('does not duplicate Origin when the upstream already varies on Origin', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('ok', {
+        status: 200,
+        headers: { vary: 'Origin, Cookie' },
+      }),
+    );
+    const service = new HttpProxyService(config(), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
+
+    await service.handle(
+      request({
+        url: '/api/messages',
+        headers: { origin: 'http://localhost:5173' },
+      }),
+      res,
+      jest.fn(),
+    );
+
+    expect(state.headers.get('vary')).toBe('Origin, Cookie');
   });
 
   it.each([

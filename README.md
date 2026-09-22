@@ -149,7 +149,7 @@ Plusieurs origines :
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
-Aucune origine n'est réfléchie automatiquement. Une application Electron qui n'envoie pas d'en-tête `Origin` n'est pas bloquée par CORS HTTP; côté Socket.IO, Message-Service conserve aussi sa validation actuelle.
+Aucune origine n'est réfléchie automatiquement. Les en-têtes `Access-Control-Allow-*` et `Access-Control-Max-Age` ne sont émis que si l'origine appartient exactement à `CORS_ORIGINS`. Lorsqu'un service amont fournit `Vary`, le Gateway le conserve et, lorsqu’une requête contient `Origin`, le fusionne avec `Origin` au lieu de le remplacer. Une application Electron qui n'envoie pas d'en-tête `Origin` n'est pas bloquée par CORS HTTP; côté Socket.IO, Message-Service conserve aussi sa validation actuelle.
 
 ## Timeouts et erreurs
 
@@ -213,7 +213,7 @@ Le Compose global d’Infra contient maintenant cette intégration.
 
 | Variable | Défaut | Rôle |
 |---|---:|---|
-| `PORT` | `3000` | port du Gateway |
+| `PORT` | `3000` | port TCP du Gateway, validé entre `1` et `65535` |
 | `AUTH_SERVICE_URL` | `http://localhost:3001` | Auth-Service |
 | `ROOM_SERVICE_URL` | `http://localhost:3003` | Room-Service |
 | `MESSAGE_SERVICE_URL` | `http://localhost:3004` | Message-Service |
@@ -238,5 +238,10 @@ npx prettier --check "src/**/*.ts" "test/**/*.ts"
 ```
 
 La couverture Jest est bloquante à 100 % pour Statements, Branches, Functions et Lines.
+`src/main.ts` est la seule exclusion explicite : il orchestre l'ouverture du port et le branchement WebSocket, comportements exercés par les tests e2e plutôt que par les tests unitaires. `src/app.module.ts` reste inclus dans la couverture.
+
+## Overrides npm
+
+L'override `multer` force une version corrigée de cette dépendance transitive utilisée par `@nestjs/platform-express`; il est conservé pour éviter de réintroduire une version vulnérable lors d'une résolution de dépendances. L'ancien override `deepmerge-ts` a été retiré puisqu'aucune dépendance du lockfile actuel ne l'utilise.
 
 Voir aussi [`docs/API.md`](docs/API.md) et [`AGENTS.md`](AGENTS.md).

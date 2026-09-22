@@ -102,6 +102,12 @@ describe('resolveGatewayConfig', () => {
     },
   );
 
+  it('rejects a TCP port above 65535', () => {
+    expect(() => resolveGatewayConfig({ PORT: '65536' })).toThrow(
+      'PORT doit être compris entre 1 et 65535',
+    );
+  });
+
   it.each([
     ['AUTH_SERVICE_URL', 'not-a-url', 'URL HTTP(S) valide'],
     ['ROOM_SERVICE_URL', 'ftp://rooms.local', 'HTTP ou HTTPS'],

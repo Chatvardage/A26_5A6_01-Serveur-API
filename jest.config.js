@@ -7,8 +7,8 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.spec.ts',
+    // Point d'entrée réseau (listen + WebSocket) validé par les tests e2e.
     '!src/main.ts',
-    '!src/app.module.ts',
   ],
   coverageDirectory: 'coverage',
   testEnvironment: 'node',

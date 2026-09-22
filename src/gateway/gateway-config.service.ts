@@ -38,6 +38,18 @@ function positiveInteger(
   return value;
 }
 
+function portNumber(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+): number {
+  const value = positiveInteger(environment, name, fallback);
+  if (value > 65_535) {
+    throw new Error(`${name} doit être compris entre 1 et 65535 : "${value}"`);
+  }
+  return value;
+}
+
 function serviceUrl(
   environment: NodeJS.ProcessEnv,
   name: string,
@@ -119,7 +131,7 @@ export function resolveGatewayConfig(
   }
 
   return {
-    port: positiveInteger(environment, 'PORT', 3000),
+    port: portNumber(environment, 'PORT', 3000),
     authServiceUrl: serviceUrl(
       environment,
       'AUTH_SERVICE_URL',
