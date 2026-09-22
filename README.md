@@ -1,114 +1,241 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# A26_5A6_01-Serveur-API — Chatvardage C2
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API Gateway HTTP/WebSocket de Chatvardage. Le Frontend Electron et le Dashboard parlent à ce dépôt sur le port `3000`; le Gateway relaie ensuite vers Auth-Service, Room-Service, Message-Service et User-Config-Service.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Responsabilité
 
-## Description
+Le Serveur-API :
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- fournit un point d'entrée unique;
+- relaie les routes HTTP sans changer leur contrat;
+- transmet `Authorization: Bearer <JWT>` tel quel aux services;
+- pour User-Config, valide le Bearer auprès d’Auth puis injecte un `x-user-id` fiable;
+- applique CORS au point d'entrée;
+- limite `POST /api/auth/login` et `/api/auth/register` avant Argon2;
+- transforme uniquement les pannes de transport en `503/504`;
+- relaie Socket.IO (`/socket.io`) vers Message-Service;
+- fournit son liveness et un diagnostic des services internes.
 
-## Project setup
+Il **ne possède aucune base de données**, ne décode pas le JWT et ne communique pas directement avec Redis. Pour User-Config seulement, l'identité provient de `Auth-Service /api/auth/me`; un `x-user-id` fourni par le client est supprimé.
 
-```bash
-$ npm install
+## Routage
+
+```text
+Frontend Electron / Dashboard
+              |
+              | HTTP + Socket.IO
+              v
+       Serveur-API :3000
+       /      |       |       \
+      v       v       v        v
+ Auth :3001 Room :3003 Message :3004 Config :3005
+                         |
+                         +--> PostgreSQL
+                         +--> Redis Pub/Sub
+                         +--> Socket.IO /messages
 ```
 
-## Compile and run the project
+| Préfixe reçu | Destination |
+|---|---|
+| `/api/auth/*` | Auth-Service |
+| `/api/users/*` | Auth-Service |
+| `/api/rooms/*` | Room-Service |
+| `/api/admin/rooms/*` | Room-Service |
+| `/api/messages/*` | Message-Service |
+| `/socket.io/*` | Message-Service |
+| `/api/config-utilisateur/*` | User-Config-Service (après validation Auth) |
+
+Le chemin et la query string restent inchangés.
+
+## Installation locale
+
+Prérequis : Node.js 22.
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
+npm ci
+npm run start:dev
 ```
 
-## Run tests
+Par défaut :
+
+```env
+PORT=3000
+AUTH_SERVICE_URL=http://localhost:3001
+ROOM_SERVICE_URL=http://localhost:3003
+MESSAGE_SERVICE_URL=http://localhost:3004
+USER_CONFIG_SERVICE_URL=http://localhost:3005
+```
+
+Le Gateway peut démarrer même si les services ne le sont pas encore. `GET /api/health` restera `200`; `GET /api/health/upstreams` indiquera les dépendances indisponibles.
+
+## Exemple Auth via Gateway
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifiant":"monpseudo","mot_de_passe":"motdepasse123"}'
 ```
 
-## Deployment
+La réponse vient directement d'Auth-Service.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Exemple Room via Gateway
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl http://localhost:3000/api/rooms \
+  -H "Authorization: Bearer <JWT>"
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Room-Service conserve sa propre règle : les routes optionnellement/protégées valident le JWT auprès d'Auth-Service.
 
-## Observability
+## Exemple User-Config via Gateway
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+```bash
+curl http://localhost:3000/api/config-utilisateur \
+  -H "Authorization: Bearer <JWT>"
+```
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service.
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+## Exemple Message REST
 
-## Resources
+```bash
+curl -X POST http://localhost:3000/api/messages \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"recipientId":"uuid-destinataire","content":"Salut!"}'
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## Exemple Socket.IO
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```js
+const socket = io('http://localhost:3000/messages', {
+  auth: { token: jwt },
+});
 
-## Support
+socket.emit('private-message.send', {
+  recipientId: 'uuid-destinataire',
+  content: 'Salut!',
+});
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service.
 
-## Stay in touch
+## Rate limit Auth
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Valeurs de développement :
 
-## License
+```env
+AUTH_RATE_LIMIT_WINDOW_MS=60000
+AUTH_RATE_LIMIT_MAX=10
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+La limite est appliquée **par IP et par route** à :
+
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+
+Une requête refusée reçoit `429` et `Retry-After`. Le store est en mémoire, adapté au Compose C2 à une instance. Si plusieurs instances du Gateway sont déployées plus tard, ce compteur devra être partagé (par exemple Redis).
+
+## CORS
+
+```env
+CORS_ORIGINS=http://localhost:5173
+```
+
+Plusieurs origines :
+
+```env
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+```
+
+Aucune origine n'est réfléchie automatiquement. Une application Electron qui n'envoie pas d'en-tête `Origin` n'est pas bloquée par CORS HTTP; côté Socket.IO, Message-Service conserve aussi sa validation actuelle.
+
+## Timeouts et erreurs
+
+```env
+PROXY_TIMEOUT_MS=5000
+MAX_PROXY_BODY_BYTES=1048576
+```
+
+Le Gateway préserve les codes renvoyés par les services (`400`, `401`, `403`, `404`, `409`, etc.). Il crée seulement :
+
+- `413` si le corps dépasse la limite Gateway;
+- `429` si le rate limit Auth est dépassé;
+- `503` si une destination interne est injoignable;
+- `504` si une destination dépasse le timeout.
+
+## Healthchecks
+
+```bash
+curl http://localhost:3000/api/health
+curl http://localhost:3000/api/health/upstreams
+```
+
+Le premier est un liveness du Gateway. Le second appelle réellement les healthchecks Auth, Room, Message et User-Config.
+
+## Docker / Infra
+
+Le Dockerfile expose `3000` et contient un healthcheck sur `/api/health`.
+
+Dans `A26_5A6_01-Infra/docker-compose.yml`, l'intégration attendue est :
+
+```yaml
+serveur-api:
+  build:
+    context: ../A26_5A6_01-Serveur-API
+  environment:
+    PORT: 3000
+    AUTH_SERVICE_URL: http://auth-service:3001
+    ROOM_SERVICE_URL: http://room-service:3003
+    MESSAGE_SERVICE_URL: http://message-service:3004
+    USER_CONFIG_SERVICE_URL: http://user-config-service:3005
+    CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  ports:
+    - "3000:3000"
+  depends_on:
+    auth-service:
+      condition: service_healthy
+    room-service:
+      condition: service_healthy
+    message-service:
+      condition: service_healthy
+    user-config-service:
+      condition: service_healthy
+  networks:
+    - chatvardage
+```
+
+Le Compose global d’Infra contient maintenant cette intégration.
+
+## Variables d'environnement
+
+| Variable | Défaut | Rôle |
+|---|---:|---|
+| `PORT` | `3000` | port du Gateway |
+| `AUTH_SERVICE_URL` | `http://localhost:3001` | Auth-Service |
+| `ROOM_SERVICE_URL` | `http://localhost:3003` | Room-Service |
+| `MESSAGE_SERVICE_URL` | `http://localhost:3004` | Message-Service |
+| `USER_CONFIG_SERVICE_URL` | `http://localhost:3005` | User-Config-Service |
+| `PROXY_TIMEOUT_MS` | `5000` | délai HTTP/WS interne |
+| `MAX_PROXY_BODY_BYTES` | `1048576` | corps max bufferisé |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | `60000` | fenêtre rate-limit Auth |
+| `AUTH_RATE_LIMIT_MAX` | `10` | requêtes max par IP/route/fenêtre |
+| `CORS_ORIGINS` | `http://localhost:5173` | liste blanche CORS |
+| `TRUST_PROXY` | `false` | accepte les `X-Forwarded-*` entrants seulement derrière un proxy de confiance |
+
+## Vérifications avant PR
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run test:cov
+npm run test:e2e
+npm run build
+npx prettier --check "src/**/*.ts" "test/**/*.ts"
+```
+
+La couverture Jest est bloquante à 100 % pour Statements, Branches, Functions et Lines.
+
+Voir aussi [`docs/API.md`](docs/API.md) et [`AGENTS.md`](AGENTS.md).

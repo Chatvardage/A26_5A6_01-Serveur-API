@@ -1,0 +1,151 @@
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import * as http from 'node:http';
+import * as https from 'node:https';
+import { Duplex } from 'node:stream';
+import { GatewayConfigService } from './gateway-config.service';
+import { isSocketIoPath } from './proxy-routing';
+
+@Injectable()
+export class WebSocketProxyService implements OnModuleDestroy {
+  private readonly logger = new Logger(WebSocketProxyService.name);
+  private readonly httpRequest = http.request;
+  private readonly httpsRequest = https.request;
+  private server?: http.Server;
+  private upgradeListener?: (
+    request: http.IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ) => void;
+
+  constructor(private readonly config: GatewayConfigService) {}
+
+  attach(server: http.Server): void {
+    if (this.server === server) {
+      return;
+    }
+
+    this.detach();
+    this.server = server;
+    this.upgradeListener = (request, socket, head) => {
+      const pathname = new URL(request.url ?? '/', 'http://gateway.local')
+        .pathname;
+      if (!isSocketIoPath(pathname)) {
+        return;
+      }
+
+      this.proxyUpgrade(request, socket, head);
+    };
+    server.on('upgrade', this.upgradeListener);
+  }
+
+  detach(): void {
+    if (this.server && this.upgradeListener) {
+      this.server.off('upgrade', this.upgradeListener);
+    }
+    this.server = undefined;
+    this.upgradeListener = undefined;
+  }
+
+  onModuleDestroy(): void {
+    this.detach();
+  }
+
+  private proxyUpgrade(
+    request: http.IncomingMessage,
+    clientSocket: Duplex,
+    clientHead: Buffer,
+  ): void {
+    const target = new URL(this.config.messageServiceUrl);
+    const headers = { ...request.headers, host: target.host };
+    const requestOptions: http.RequestOptions = {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || (target.protocol === 'https:' ? 443 : 80),
+      method: request.method ?? 'GET',
+      path: request.url ?? '/socket.io/',
+      headers,
+      timeout: this.config.proxyTimeoutMs,
+    };
+    const upstreamRequest =
+      target.protocol === 'https:'
+        ? this.httpsRequest(requestOptions)
+        : this.httpRequest(requestOptions);
+
+    upstreamRequest.on(
+      'upgrade',
+      (upstreamResponse, upstreamSocket, upstreamHead) => {
+        clientSocket.write(this.serializeUpgradeResponse(upstreamResponse));
+
+        if (upstreamHead.length > 0) {
+          clientSocket.write(upstreamHead);
+        }
+        if (clientHead.length > 0) {
+          upstreamSocket.write(clientHead);
+        }
+
+        upstreamSocket.pipe(clientSocket);
+        clientSocket.pipe(upstreamSocket);
+      },
+    );
+
+    upstreamRequest.on('response', (upstreamResponse) => {
+      clientSocket.write(this.serializeHttpResponse(upstreamResponse));
+      upstreamResponse.pipe(clientSocket);
+    });
+
+    upstreamRequest.on('timeout', () => {
+      upstreamRequest.destroy(new Error('WebSocket upstream timeout'));
+    });
+
+    upstreamRequest.on('error', (error) => {
+      this.logger.warn(`Erreur proxy WebSocket: ${error.message}`);
+      if (!clientSocket.destroyed) {
+        clientSocket.end(
+          'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n',
+        );
+      }
+    });
+
+    upstreamRequest.end();
+  }
+
+  private serializeUpgradeResponse(response: http.IncomingMessage): string {
+    const statusCode = response.statusCode ?? 101;
+    const statusMessage = response.statusMessage ?? 'Switching Protocols';
+    return this.serializeHeaders(
+      `HTTP/1.1 ${statusCode} ${statusMessage}`,
+      response.headers,
+    );
+  }
+
+  private serializeHttpResponse(response: http.IncomingMessage): string {
+    const statusCode = response.statusCode ?? 502;
+    const statusMessage = response.statusMessage ?? 'Bad Gateway';
+    return this.serializeHeaders(
+      `HTTP/1.1 ${statusCode} ${statusMessage}`,
+      response.headers,
+    );
+  }
+
+  private serializeHeaders(
+    statusLine: string,
+    headers: http.IncomingHttpHeaders,
+  ): string {
+    const lines = [statusLine];
+
+    for (const [name, value] of Object.entries(headers)) {
+      if (value === undefined) {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          lines.push(`${name}: ${item}`);
+        }
+      } else {
+        lines.push(`${name}: ${value}`);
+      }
+    }
+
+    return `${lines.join('\r\n')}\r\n\r\n`;
+  }
+}

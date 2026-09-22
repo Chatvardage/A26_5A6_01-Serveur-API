@@ -1,0 +1,84 @@
+# AGENTS.md — Chatvardage Serveur-API
+
+## Mission
+
+Ce dépôt est le **Serveur-API / API Gateway** de Chatvardage pour le Contrôle 2 du cours `420-5A6-ST – A26`.
+
+Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il ne possède aucune donnée métier et ne doit pas dupliquer la logique des microservices.
+
+## Architecture d'équipe
+
+- `Frontend` : Electron + ChatGateway réel.
+- `Serveur-API` : proxy HTTP/Socket.IO, CORS, rate limiting et healthcheck.
+- `Authentification` : utilisateurs, authentification et rôles.
+- `Room-Service` : salons, membres et invitations.
+- `Message-Service` : messages privés, historique, Redis et Socket.IO.
+- `User-Config-Service` : alias, thème, langue, présence et préférences.
+- `Dashboard` : panneau d'administration.
+- `Infra` : PostgreSQL, Redis, Docker Compose et orchestration.
+
+## Règles impératives
+
+1. Ne pas créer de base de données, de schéma Prisma ou de table dans ce dépôt.
+2. Ne pas valider/décoder localement le JWT : transmettre `Authorization: Bearer <JWT>` tel quel. Auth reste la source de vérité.
+3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me`, supprime ces en-têtes entrants et crée `x-user-id` à partir de l’identité Auth validée.
+4. Préserver les méthodes, chemins, query strings, corps, codes HTTP et réponses des services internes.
+5. Le Gateway peut produire ses propres erreurs uniquement avant/pendant le transport : `413`, `429`, `503`, `504`.
+6. Appliquer le rate limit à `POST /api/auth/login` et `POST /api/auth/register` avant Auth-Service.
+7. Le temps réel Message-Service reste dans Message-Service. Le Gateway ne fait que relayer `/socket.io` vers le port `3004`.
+8. Ne jamais brancher directement le Gateway à Redis pour recréer la logique de messages privés.
+
+## Routage actuel
+
+- `/api/auth/*` -> Auth-Service (`3001`)
+- `/api/users/*` -> Auth-Service (`3001`)
+- `/api/rooms/*` -> Room-Service (`3003`)
+- `/api/admin/rooms/*` -> Room-Service (`3003`)
+- `/api/messages/*` -> Message-Service (`3004`)
+- `/api/config-utilisateur/*` -> User-Config-Service (`3005`), après validation du Bearer auprès d’Auth
+- `/socket.io/*` -> Message-Service (`3004`, HTTP polling + WebSocket upgrade)
+- `/api/health` -> liveness du Gateway
+- `/api/health/upstreams` -> état des quatre services intégrés
+
+Toute nouvelle famille de routes doit être ajoutée explicitement; ne jamais transformer ce Gateway en proxy ouvert.
+
+## Sécurité
+
+- `TRUST_PROXY=false` par défaut. Ne l'activer que derrière un reverse proxy contrôlé.
+- `CORS_ORIGINS` est une liste blanche exacte.
+- `MAX_PROXY_BODY_BYTES` borne ce que le Gateway bufferise avant transfert.
+- `AUTH_RATE_LIMIT_*` limite les calculs Argon2 déclenchés par les routes publiques d'Auth.
+- Une erreur réseau interne ne doit pas exposer l'URL, la stack ou les détails du réseau au client.
+
+## Tests obligatoires avant PR
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run test:cov
+npm run test:e2e
+npm run build
+npx prettier --check "src/**/*.ts" "test/**/*.ts"
+```
+
+Le seuil Jest global est de **100 % Statements, Branches, Functions et Lines** pour le code suivi par la couverture.
+
+Ne jamais annoncer la PR prête si une commande requise échoue.
+
+## Docker / Infra
+
+Dans le Compose global, utiliser :
+
+```env
+AUTH_SERVICE_URL=http://auth-service:3001
+ROOM_SERVICE_URL=http://room-service:3003
+MESSAGE_SERVICE_URL=http://message-service:3004
+USER_CONFIG_SERVICE_URL=http://user-config-service:3005
+```
+
+Le Gateway écoute sur `3000`. Les services internes peuvent rester liés à `127.0.0.1` côté hôte puisque la communication inter-conteneurs passe par `chatvardage-network`.
+
+## Documentation
+
+Tout changement de route, variable d'environnement, timeout, CORS, rate limit ou comportement de proxy doit mettre à jour `README.md`, `.env.example`, `docs/API.md` et ce fichier si la règle de travail change.

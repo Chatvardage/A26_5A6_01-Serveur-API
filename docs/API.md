@@ -1,0 +1,106 @@
+# Contrat HTTP/WebSocket du Serveur-API
+
+Le Serveur-API conserve les contrats des microservices. Il ne renomme pas les champs et ne convertit pas leurs codes HTTP.
+
+## Authentification -> Auth-Service
+
+| Méthode | Route Gateway | Protection |
+|---|---|---|
+| POST | `/api/auth/register` | publique, rate-limit Gateway |
+| POST | `/api/auth/login` | publique, rate-limit Gateway |
+| GET | `/api/auth/me` | Bearer JWT |
+| PATCH | `/api/auth/me` | Bearer JWT |
+| DELETE | `/api/auth/me` | Bearer JWT |
+| GET | `/api/users` | admin |
+| POST | `/api/users` | admin |
+| GET | `/api/users/:id` | admin |
+| PATCH | `/api/users/:id` | admin |
+| DELETE | `/api/users/:id` | admin |
+| PATCH | `/api/users/:id/role` | admin |
+
+## Salons -> Room-Service
+
+| Méthode | Route Gateway |
+|---|---|
+| GET | `/api/rooms` |
+| GET | `/api/rooms/:id` |
+| POST | `/api/rooms` |
+| PATCH | `/api/rooms/:id` |
+| DELETE | `/api/rooms/:id` |
+| GET | `/api/rooms/invitations/me` |
+| POST | `/api/rooms/:id/invitations` |
+| POST | `/api/rooms/:id/invitations/accept` |
+| POST | `/api/rooms/:id/invitations/refuse` |
+| POST | `/api/rooms/:id/join` |
+| POST | `/api/rooms/:id/leave` |
+| GET | `/api/admin/rooms` |
+
+Les routes publiques/optionnelles/protégées restent déterminées par Room-Service. Le Gateway ne remplace pas sa validation auprès d'Auth-Service.
+
+## Messages privés -> Message-Service
+
+| Méthode | Route Gateway |
+|---|---|
+| POST | `/api/messages` |
+| GET | `/api/messages/history/:otherUserId?limit=50&cursor=<messageId>` |
+| GET | `/api/messages/:id` |
+| PATCH | `/api/messages/:id` |
+| DELETE | `/api/messages/:id` |
+
+Toutes les routes de messages privés requièrent le JWT selon le contrat de Message-Service.
+
+## Configuration utilisateur -> User-Config-Service
+
+| Méthode | Route Gateway | Protection |
+|---|---|---|
+| GET | `/api/config-utilisateur` | Bearer JWT validé auprès d’Auth |
+| PATCH | `/api/config-utilisateur` | Bearer JWT validé auprès d’Auth |
+| PUT | `/api/config-utilisateur/presence` | Bearer JWT validé auprès d’Auth |
+
+Le client n’envoie jamais une identité de confiance. Le Gateway supprime les en-têtes entrants `x-user-id` et `x-user-role`, appelle `GET /api/auth/me` avec le Bearer reçu, puis transmet à User-Config un `x-user-id` dérivé de l’utilisateur Auth validé. Une erreur Auth est relayée avec son code d’origine.
+
+## Socket.IO
+
+Le client se connecte au Gateway :
+
+```js
+const socket = io('http://localhost:3000/messages', {
+  auth: { token: jwt },
+});
+```
+
+Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie sans modifier le protocole vers Message-Service (`3004`). Le namespace reste `/messages` et l'identité est validée par Message-Service auprès d'Auth-Service.
+
+Émission client : `private-message.send`.
+
+Événements serveur :
+
+- `private-message.created`
+- `private-message.updated`
+- `private-message.deleted`
+
+## Health
+
+### GET `/api/health`
+
+Liveness du Gateway. Ne dépend pas des bases ni des autres services.
+
+### GET `/api/health/upstreams`
+
+Teste :
+
+- Auth -> `/health`
+- Room -> `/api/health`
+- Message -> `/api/health`
+- User-Config -> `/api/health`
+
+Retourne `200` si tous répondent avec un statut HTTP 2xx, sinon `503` et `status: "degraded"`.
+
+## Erreurs produites par le Gateway
+
+- `413 Payload Too Large` : corps au-dessus de `MAX_PROXY_BODY_BYTES`.
+- `429 Too Many Requests` : limite de login/register atteinte.
+- `503 Service Unavailable` : service interne injoignable.
+- `504 Gateway Timeout` : délai `PROXY_TIMEOUT_MS` dépassé.
+
+Toutes les erreurs fonctionnelles renvoyées par Auth/Room/Message/User-Config sont transmises avec leur code d'origine. Lors de l'accès à User-Config, une réponse de refus d'Auth est également relayée telle quelle.
