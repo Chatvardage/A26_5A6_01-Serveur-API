@@ -29,6 +29,7 @@ const UPSTREAM_CORS_HEADERS = new Set([
 ]);
 
 class PayloadTooLargeError extends Error {}
+class InvalidAuthContractError extends Error {}
 
 @Injectable()
 export class HttpProxyService {
@@ -64,7 +65,7 @@ export class HttpProxyService {
 
     if (isRateLimitedAuthRoute(request.method, requestUrl.pathname)) {
       const result = this.rateLimit.consume(
-        `${this.clientKey(request)}:${requestUrl.pathname}`,
+        `${this.clientKey(request)}|${requestUrl.pathname}`,
       );
       response.setHeader('X-RateLimit-Limit', String(result.limit));
       response.setHeader('X-RateLimit-Remaining', String(result.remaining));
@@ -97,6 +98,18 @@ export class HttpProxyService {
           statusCode: 413,
           message: 'Corps de requête trop volumineux',
           error: 'Payload Too Large',
+        });
+        return;
+      }
+
+      if (error instanceof InvalidAuthContractError) {
+        this.logger.error(
+          `Contrat Auth invalide pour ${upstream}: ${error.message}`,
+        );
+        response.status(502).json({
+          statusCode: 502,
+          message: "Réponse invalide du service d'authentification",
+          error: 'Bad Gateway',
         });
         return;
       }
@@ -145,9 +158,12 @@ export class HttpProxyService {
       this.baseUrl(upstream),
     );
 
-    const forwardedBody =
+    // Node 22/undici accepte Buffer à l'exécution comme BodyInit. Les types
+    // @types/node actuels le généralisent toutefois en Buffer<ArrayBufferLike>,
+    // d'où ce cast explicite sans seconde allocation mémoire.
+    const forwardedBody: BodyInit | undefined =
       this.hasRequestBody(request.method) && body !== undefined
-        ? Uint8Array.from(body)
+        ? (body as unknown as BodyInit)
         : undefined;
 
     const upstreamResponse = await fetch(target, {
@@ -214,7 +230,13 @@ export class HttpProxyService {
       return null;
     }
 
-    const payload: unknown = await authResponse.json();
+    let payload: unknown;
+    try {
+      payload = await authResponse.json();
+    } catch {
+      throw new InvalidAuthContractError('JSON invalide');
+    }
+
     if (
       typeof payload !== 'object' ||
       payload === null ||
@@ -223,7 +245,7 @@ export class HttpProxyService {
       payload.id.trim() === '' ||
       payload.id.length > 255
     ) {
-      throw new Error('Réponse Auth invalide pour User-Config');
+      throw new InvalidAuthContractError('champ id absent ou invalide');
     }
 
     return payload.id;
@@ -243,7 +265,10 @@ export class HttpProxyService {
         lowerName === 'host' ||
         lowerName === 'content-length' ||
         lowerName === 'x-user-id' ||
-        lowerName === 'x-user-role'
+        lowerName === 'x-user-role' ||
+        lowerName === 'x-forwarded-for' ||
+        lowerName === 'x-forwarded-proto' ||
+        lowerName === 'x-forwarded-host'
       ) {
         continue;
       }
@@ -299,6 +324,7 @@ export class HttpProxyService {
       response.setHeader(name, value);
     });
 
+    // Node >= 22 est imposé par package.json et par l'image Docker.
     const cookies = (
       upstream.headers as Headers & { getSetCookie: () => string[] }
     ).getSetCookie();
@@ -334,13 +360,14 @@ export class HttpProxyService {
 
   private applyCors(request: Request, response: Response): void {
     const origin = request.get('origin');
-    if (origin) {
-      response.setHeader('Vary', 'Origin');
-      if (this.allowedOrigins.has(origin)) {
-        response.setHeader('Access-Control-Allow-Origin', origin);
-      }
+    if (!origin) {
+      return;
     }
 
+    response.setHeader('Vary', 'Origin');
+    if (this.allowedOrigins.has(origin)) {
+      response.setHeader('Access-Control-Allow-Origin', origin);
+    }
     response.setHeader(
       'Access-Control-Allow-Methods',
       'GET,POST,PATCH,DELETE,OPTIONS',

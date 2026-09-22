@@ -15,6 +15,7 @@ function config(
   return {
     messageServiceUrl: 'http://message-service:3004',
     proxyTimeoutMs: 5000,
+    trustProxy: false,
     ...overrides,
   } as GatewayConfigService;
 }
@@ -114,8 +115,12 @@ describe('WebSocketProxyService', () => {
         origin: 'http://localhost:5173',
         'x-user-id': 'forged-user',
         'x-user-role': 'admin',
+        'x-forwarded-for': '1.2.3.4',
+        'x-forwarded-proto': 'https',
+        'x-forwarded-host': 'evil.example',
         'x-optional': undefined,
       },
+      socket: { remoteAddress: '10.0.0.5' },
     } as unknown as http.IncomingMessage;
 
     (service as any).proxyUpgrade(incoming, client, Buffer.from('client-head'));
@@ -137,6 +142,15 @@ describe('WebSocketProxyService', () => {
     const requestOptions = requestSpy.mock.calls[0][0] as http.RequestOptions;
     expect(requestOptions.headers).not.toHaveProperty('x-user-id');
     expect(requestOptions.headers).not.toHaveProperty('x-user-role');
+    expect(requestOptions.headers).toHaveProperty(
+      'x-forwarded-for',
+      '10.0.0.5',
+    );
+    expect(requestOptions.headers).toHaveProperty('x-forwarded-proto', 'http');
+    expect(requestOptions.headers).toHaveProperty(
+      'x-forwarded-host',
+      'localhost:3000',
+    );
     expect(requestOptions.headers).not.toHaveProperty('x-optional');
     expect(req.end).toHaveBeenCalledTimes(1);
 
@@ -172,15 +186,59 @@ describe('WebSocketProxyService', () => {
     expect(client.pipe.mock.calls).toEqual([[upstream]]);
   });
 
+  it('honors an existing X-Forwarded-For chain only when trustProxy is enabled', () => {
+    const req = upstreamRequest();
+    const service = new WebSocketProxyService(config({ trustProxy: true }));
+    const requestSpy = jest.fn().mockReturnValue(req);
+    (service as any).httpRequest = requestSpy;
+
+    (service as any).proxyUpgrade(
+      {
+        method: 'GET',
+        url: '/socket.io/',
+        headers: {
+          host: 'gateway.example',
+          'x-forwarded-for': ['203.0.113.1, 203.0.113.2'],
+          'x-forwarded-proto': 'https',
+        },
+        socket: { remoteAddress: '10.0.0.8' },
+      },
+      socket(),
+      Buffer.alloc(0),
+    );
+
+    const requestOptions = requestSpy.mock.calls[0][0] as http.RequestOptions;
+    expect(requestOptions.headers).toHaveProperty(
+      'x-forwarded-for',
+      '203.0.113.1, 203.0.113.2, 10.0.0.8',
+    );
+    expect(requestOptions.headers).toHaveProperty('x-forwarded-proto', 'https');
+    expect(requestOptions.headers).toHaveProperty(
+      'x-forwarded-host',
+      'gateway.example',
+    );
+    expect((service as any).firstHeader('single')).toBe('single');
+  });
+
   it('uses HTTPS defaults and GET/default Socket.IO path when values are absent', () => {
     const req = upstreamRequest();
     const service = new WebSocketProxyService(
-      config({ messageServiceUrl: 'https://message.example' }),
+      config({
+        messageServiceUrl: 'https://message.example',
+        trustProxy: true,
+      }),
     );
     const requestSpy = jest.fn().mockReturnValue(req);
     (service as any).httpsRequest = requestSpy;
 
-    (service as any).proxyUpgrade({ headers: {} }, socket(), Buffer.alloc(0));
+    (service as any).proxyUpgrade(
+      {
+        headers: {},
+        socket: { encrypted: true },
+      },
+      socket(),
+      Buffer.alloc(0),
+    );
 
     expect(requestSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -189,6 +247,7 @@ describe('WebSocketProxyService', () => {
         port: 443,
         method: 'GET',
         path: '/socket.io/',
+        headers: expect.objectContaining({ 'x-forwarded-proto': 'https' }),
       }),
     );
   });

@@ -183,6 +183,11 @@ describe('HttpProxyService', () => {
         jest.fn(),
       );
       expect(state.headers.has('access-control-allow-origin')).toBe(false);
+      if (!('origin' in headers)) {
+        expect(state.headers.has('access-control-allow-methods')).toBe(false);
+        expect(state.headers.has('access-control-allow-headers')).toBe(false);
+        expect(state.headers.has('access-control-max-age')).toBe(false);
+      }
     }
   });
 
@@ -194,7 +199,11 @@ describe('HttpProxyService', () => {
     const next = jest.fn();
 
     await service.handle(
-      request({ method: 'OPTIONS', url: '/api/messages' }),
+      request({
+        method: 'OPTIONS',
+        url: '/api/messages',
+        headers: { origin: 'http://localhost:5173' },
+      }),
       res,
       next,
     );
@@ -246,7 +255,7 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('10.0.0.8:/api/auth/login');
+    expect(consume).toHaveBeenCalledWith('10.0.0.8|/api/auth/login');
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(state.statusCode).toBe(429);
     expect(state.headers.get('retry-after')).toBe('42');
@@ -307,7 +316,7 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('127.0.0.9:/api/auth/register');
+    expect(consume).toHaveBeenCalledWith('127.0.0.9|/api/auth/register');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSpy.mock.calls[0];
     expect(requestTargetToString(url)).toBe(
@@ -459,7 +468,7 @@ describe('HttpProxyService', () => {
     ['blank id', { id: '   ' }],
     ['oversized id', { id: 'a'.repeat(256) }],
   ])(
-    'returns 503 when Auth returns an invalid identity payload: %s',
+    'returns 502 when Auth returns an invalid identity payload: %s',
     async (_caseName, payload) => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(payload), {
@@ -481,14 +490,43 @@ describe('HttpProxyService', () => {
         jest.fn(),
       );
 
-      expect(state.statusCode).toBe(503);
+      expect(state.statusCode).toBe(502);
       expect(state.jsonBody).toEqual({
-        statusCode: 503,
-        message: 'Service interne indisponible',
-        error: 'Service Unavailable',
+        statusCode: 502,
+        message: "Réponse invalide du service d'authentification",
+        error: 'Bad Gateway',
       });
     },
   );
+
+  it('returns 502 when Auth returns malformed JSON for User-Config', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('{', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const service = new HttpProxyService(config(), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
+
+    await service.handle(
+      request({
+        url: '/api/config-utilisateur',
+        headers: { authorization: 'Bearer jwt-valid' },
+      }),
+      res,
+      jest.fn(),
+    );
+
+    expect(state.statusCode).toBe(502);
+    expect(state.jsonBody).toEqual({
+      statusCode: 502,
+      message: "Réponse invalide du service d'authentification",
+      error: 'Bad Gateway',
+    });
+  });
 
   it('uses trusted X-Forwarded headers only when configured', async () => {
     const fetchSpy = jest
@@ -517,7 +555,7 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('203.0.113.1:/api/auth/login');
+    expect(consume).toHaveBeenCalledWith('203.0.113.1|/api/auth/login');
     const headers = fetchSpy.mock.calls[0][1]?.headers as Headers;
     expect(headers.get('x-forwarded-for')).toBe(
       '203.0.113.1, 203.0.113.2, 10.0.0.10',
@@ -546,7 +584,7 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('unknown:/api/auth/login');
+    expect(consume).toHaveBeenCalledWith('unknown|/api/auth/login');
     const headers = fetchSpy.mock.calls[0][1]?.headers as Headers;
     expect(headers.get('x-forwarded-for')).toBe('unknown');
   });
@@ -565,7 +603,7 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('127.0.0.1:/api/auth/login');
+    expect(consume).toHaveBeenCalledWith('127.0.0.1|/api/auth/login');
   });
 
   it('rejects oversized bodies before contacting the upstream', async () => {

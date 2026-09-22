@@ -69,7 +69,7 @@ const socket = io('http://localhost:3000/messages', {
 });
 ```
 
-Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie vers Message-Service (`3004`) en supprimant les en-têtes entrants `x-user-id` et `x-user-role`. Aucun identifiant de confiance n'est injecté par le Gateway pour Socket.IO : le namespace reste `/messages` et Message-Service établit l'identité à partir de `auth.token`, validé auprès d'Auth-Service.
+Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie vers Message-Service (`3004`) en supprimant les en-têtes entrants `x-user-id` et `x-user-role`. Le Gateway reconstruit les métadonnées `x-forwarded-*`; la chaîne `x-forwarded-for` et le protocole fournis par un proxy amont ne sont honorés que lorsque `TRUST_PROXY=true`. Aucun identifiant de confiance n'est injecté par le Gateway pour Socket.IO : le namespace reste `/messages` et Message-Service établit l'identité à partir de `auth.token`, validé auprès d'Auth-Service.
 
 Émission client : `private-message.send`.
 
@@ -100,6 +100,7 @@ Retourne `200` si tous répondent avec un statut HTTP 2xx, sinon `503` et `statu
 
 - `413 Payload Too Large` : corps au-dessus de `MAX_PROXY_BODY_BYTES`.
 - `429 Too Many Requests` : limite de login/register atteinte.
+- `502 Bad Gateway` : réponse Auth 2xx dont le contrat d'identité est invalide lors d'un accès User-Config.
 - `503 Service Unavailable` : service interne injoignable.
 - `504 Gateway Timeout` : délai `PROXY_TIMEOUT_MS` dépassé.
 

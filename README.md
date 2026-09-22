@@ -12,7 +12,7 @@ Le Serveur-API :
 - pour User-Config, valide le Bearer auprès d’Auth puis injecte un `x-user-id` fiable;
 - applique CORS au point d'entrée;
 - limite `POST /api/auth/login` et `/api/auth/register` avant Argon2;
-- transforme uniquement les pannes de transport en `503/504`;
+- transforme les pannes de transport en `503/504` et signale en `502` un contrat Auth invalide lors de l'accès à User-Config;
 - relaie Socket.IO (`/socket.io`) vers Message-Service;
 - fournit son liveness et un diagnostic des services internes.
 
@@ -49,7 +49,7 @@ Le chemin et la query string restent inchangés.
 
 ## Installation locale
 
-Prérequis : Node.js 22.
+Prérequis : Node.js 22 ou plus récent. Le projet reste volontairement compilé en CommonJS (`module: commonjs`) pour rester cohérent avec NestJS, Jest/ts-jest et les fichiers de configuration CommonJS du dépôt.
 
 ```bash
 cp .env.example .env
@@ -119,7 +119,7 @@ socket.emit('private-message.send', {
 });
 ```
 
-Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service. Le Gateway supprime aussi les en-têtes entrants `x-user-id` et `x-user-role` du handshake/passage WebSocket afin qu'un client ne puisse pas usurper une identité. Aucun `x-user-id` de confiance n'est injecté pour Socket.IO : Message-Service établit lui-même l'identité à partir du token du handshake.
+Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service. Le Gateway supprime aussi les en-têtes entrants `x-user-id` et `x-user-role` du handshake/passage WebSocket afin qu'un client ne puisse pas usurper une identité. Il reconstruit également les métadonnées `x-forwarded-*` à partir de la connexion; la chaîne `x-forwarded-for` et le protocole transmis par un proxy amont ne sont honorés que si `TRUST_PROXY=true`. Aucun `x-user-id` de confiance n'est injecté pour Socket.IO : Message-Service établit lui-même l'identité à partir du token du handshake.
 
 ## Rate limit Auth
 
@@ -162,6 +162,7 @@ Le Gateway préserve les codes renvoyés par les services (`400`, `401`, `403`, 
 
 - `413` si le corps dépasse la limite Gateway;
 - `429` si le rate limit Auth est dépassé;
+- `502` si Auth répond en 2xx avec une identité invalide pendant la validation User-Config;
 - `503` si une destination interne est injoignable;
 - `504` si une destination dépasse le timeout.
 

@@ -23,7 +23,7 @@ Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il 
 2. Ne pas valider/décoder localement le JWT : transmettre `Authorization: Bearer <JWT>` tel quel. Auth reste la source de vérité.
 3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client. Les proxies HTTP et WebSocket doivent les supprimer. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me` puis crée `x-user-id` à partir de l’identité Auth validée. Pour Socket.IO, le Gateway n'injecte aucune identité : Message-Service valide `auth.token` auprès d'Auth-Service.
 4. Préserver les méthodes, chemins, query strings, corps, codes HTTP et réponses des services internes.
-5. Le Gateway peut produire ses propres erreurs uniquement avant/pendant le transport : `413`, `429`, `503`, `504`.
+5. Le Gateway peut produire ses propres erreurs uniquement avant/pendant le transport : `413`, `429`, `502` (contrat amont invalide), `503`, `504`.
 6. Appliquer le rate limit à `POST /api/auth/login` et `POST /api/auth/register` avant Auth-Service.
 7. Le temps réel Message-Service reste dans Message-Service. Le Gateway ne fait que relayer `/socket.io` vers le port `3004`.
 8. Ne jamais brancher directement le Gateway à Redis pour recréer la logique de messages privés.
@@ -44,7 +44,7 @@ Toute nouvelle famille de routes doit être ajoutée explicitement; ne jamais tr
 
 ## Sécurité
 
-- `TRUST_PROXY=false` par défaut. Ne l'activer que derrière un reverse proxy contrôlé.
+- `TRUST_PROXY=false` par défaut. Ne l'activer que derrière un reverse proxy contrôlé. Les proxies HTTP et WebSocket reconstruisent `x-forwarded-for` et n'honorent la chaîne entrante que lorsque cette option est activée.
 - `CORS_ORIGINS` est une liste blanche exacte.
 - `MAX_PROXY_BODY_BYTES` borne ce que le Gateway bufferise avant transfert.
 - `AUTH_RATE_LIMIT_*` limite les calculs Argon2 déclenchés par les routes publiques d'Auth.

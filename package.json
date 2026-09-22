@@ -44,5 +44,8 @@
   "overrides": {
     "multer": "^2.3.0",
     "deepmerge-ts": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }

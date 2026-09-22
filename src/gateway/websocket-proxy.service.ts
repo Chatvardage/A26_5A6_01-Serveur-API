@@ -56,7 +56,7 @@ export class WebSocketProxyService implements OnModuleDestroy {
     clientHead: Buffer,
   ): void {
     const target = new URL(this.config.messageServiceUrl);
-    const headers = this.forwardedHeaders(request.headers, target.host);
+    const headers = this.forwardedHeaders(request, target.host);
     const requestOptions: http.RequestOptions = {
       protocol: target.protocol,
       hostname: target.hostname,
@@ -110,18 +110,21 @@ export class WebSocketProxyService implements OnModuleDestroy {
   }
 
   private forwardedHeaders(
-    incoming: http.IncomingHttpHeaders,
+    request: http.IncomingMessage,
     targetHost: string,
   ): http.OutgoingHttpHeaders {
     const headers: http.OutgoingHttpHeaders = {};
 
-    for (const [name, value] of Object.entries(incoming)) {
+    for (const [name, value] of Object.entries(request.headers)) {
       const lowerName = name.toLowerCase();
       if (
         value === undefined ||
         lowerName === 'host' ||
         lowerName === 'x-user-id' ||
-        lowerName === 'x-user-role'
+        lowerName === 'x-user-role' ||
+        lowerName === 'x-forwarded-for' ||
+        lowerName === 'x-forwarded-proto' ||
+        lowerName === 'x-forwarded-host'
       ) {
         continue;
       }
@@ -129,8 +132,31 @@ export class WebSocketProxyService implements OnModuleDestroy {
       headers[name] = value;
     }
 
+    const remoteAddress = request.socket?.remoteAddress ?? 'unknown';
+    const existingForwardedFor = this.config.trustProxy
+      ? this.firstHeader(request.headers['x-forwarded-for'])
+      : undefined;
+    const socketWithTls = request.socket as
+      (typeof request.socket & { encrypted?: boolean }) | undefined;
+    const localProtocol = socketWithTls?.encrypted === true ? 'https' : 'http';
+    const forwardedProtocol = this.config.trustProxy
+      ? (this.firstHeader(request.headers['x-forwarded-proto']) ??
+        localProtocol)
+      : localProtocol;
+
     headers.host = targetHost;
+    headers['x-forwarded-for'] = existingForwardedFor
+      ? `${existingForwardedFor}, ${remoteAddress}`
+      : remoteAddress;
+    headers['x-forwarded-proto'] = forwardedProtocol;
+    headers['x-forwarded-host'] = this.firstHeader(request.headers.host) ?? '';
     return headers;
+  }
+
+  private firstHeader(
+    value: string | string[] | undefined,
+  ): string | undefined {
+    return Array.isArray(value) ? value[0] : value;
   }
 
   private serializeUpgradeResponse(response: http.IncomingMessage): string {
