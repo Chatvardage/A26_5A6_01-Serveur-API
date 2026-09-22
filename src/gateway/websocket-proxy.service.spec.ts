@@ -109,8 +109,14 @@ describe('WebSocketProxyService', () => {
     const incoming = {
       method: 'GET',
       url: '/socket.io/?EIO=4&transport=websocket',
-      headers: { host: 'localhost:3000', origin: 'http://localhost:5173' },
-    } as http.IncomingMessage;
+      headers: {
+        host: 'localhost:3000',
+        origin: 'http://localhost:5173',
+        'x-user-id': 'forged-user',
+        'x-user-role': 'admin',
+        'x-optional': undefined,
+      },
+    } as unknown as http.IncomingMessage;
 
     (service as any).proxyUpgrade(incoming, client, Buffer.from('client-head'));
 
@@ -122,9 +128,16 @@ describe('WebSocketProxyService', () => {
         method: 'GET',
         path: '/socket.io/?EIO=4&transport=websocket',
         timeout: 5000,
-        headers: expect.objectContaining({ host: 'message-service:3004' }),
+        headers: expect.objectContaining({
+          host: 'message-service:3004',
+          origin: 'http://localhost:5173',
+        }),
       }),
     );
+    const requestOptions = requestSpy.mock.calls[0][0] as http.RequestOptions;
+    expect(requestOptions.headers).not.toHaveProperty('x-user-id');
+    expect(requestOptions.headers).not.toHaveProperty('x-user-role');
+    expect(requestOptions.headers).not.toHaveProperty('x-optional');
     expect(req.end).toHaveBeenCalledTimes(1);
 
     const upstreamResponse = {

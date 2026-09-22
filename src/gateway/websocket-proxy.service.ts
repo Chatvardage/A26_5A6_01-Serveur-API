@@ -56,7 +56,7 @@ export class WebSocketProxyService implements OnModuleDestroy {
     clientHead: Buffer,
   ): void {
     const target = new URL(this.config.messageServiceUrl);
-    const headers = { ...request.headers, host: target.host };
+    const headers = this.forwardedHeaders(request.headers, target.host);
     const requestOptions: http.RequestOptions = {
       protocol: target.protocol,
       hostname: target.hostname,
@@ -107,6 +107,30 @@ export class WebSocketProxyService implements OnModuleDestroy {
     });
 
     upstreamRequest.end();
+  }
+
+  private forwardedHeaders(
+    incoming: http.IncomingHttpHeaders,
+    targetHost: string,
+  ): http.OutgoingHttpHeaders {
+    const headers: http.OutgoingHttpHeaders = {};
+
+    for (const [name, value] of Object.entries(incoming)) {
+      const lowerName = name.toLowerCase();
+      if (
+        value === undefined ||
+        lowerName === 'host' ||
+        lowerName === 'x-user-id' ||
+        lowerName === 'x-user-role'
+      ) {
+        continue;
+      }
+
+      headers[name] = value;
+    }
+
+    headers.host = targetHost;
+    return headers;
   }
 
   private serializeUpgradeResponse(response: http.IncomingMessage): string {

@@ -69,7 +69,7 @@ const socket = io('http://localhost:3000/messages', {
 });
 ```
 
-Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie sans modifier le protocole vers Message-Service (`3004`). Le namespace reste `/messages` et l'identité est validée par Message-Service auprès d'Auth-Service.
+Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie vers Message-Service (`3004`) en supprimant les en-têtes entrants `x-user-id` et `x-user-role`. Aucun identifiant de confiance n'est injecté par le Gateway pour Socket.IO : le namespace reste `/messages` et Message-Service établit l'identité à partir de `auth.token`, validé auprès d'Auth-Service.
 
 Émission client : `private-message.send`.
 

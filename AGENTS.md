@@ -21,7 +21,7 @@ Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il 
 
 1. Ne pas créer de base de données, de schéma Prisma ou de table dans ce dépôt.
 2. Ne pas valider/décoder localement le JWT : transmettre `Authorization: Bearer <JWT>` tel quel. Auth reste la source de vérité.
-3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me`, supprime ces en-têtes entrants et crée `x-user-id` à partir de l’identité Auth validée.
+3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client. Les proxies HTTP et WebSocket doivent les supprimer. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me` puis crée `x-user-id` à partir de l’identité Auth validée. Pour Socket.IO, le Gateway n'injecte aucune identité : Message-Service valide `auth.token` auprès d'Auth-Service.
 4. Préserver les méthodes, chemins, query strings, corps, codes HTTP et réponses des services internes.
 5. Le Gateway peut produire ses propres erreurs uniquement avant/pendant le transport : `413`, `429`, `503`, `504`.
 6. Appliquer le rate limit à `POST /api/auth/login` et `POST /api/auth/register` avant Auth-Service.

@@ -119,7 +119,7 @@ socket.emit('private-message.send', {
 });
 ```
 
-Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service.
+Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service. Le Gateway supprime aussi les en-têtes entrants `x-user-id` et `x-user-role` du handshake/passage WebSocket afin qu'un client ne puisse pas usurper une identité. Aucun `x-user-id` de confiance n'est injecté pour Socket.IO : Message-Service établit lui-même l'identité à partir du token du handshake.
 
 ## Rate limit Auth
 
@@ -135,7 +135,7 @@ La limite est appliquée **par IP et par route** à :
 - `POST /api/auth/login`
 - `POST /api/auth/register`
 
-Une requête refusée reçoit `429` et `Retry-After`. Le store est en mémoire, adapté au Compose C2 à une instance. Si plusieurs instances du Gateway sont déployées plus tard, ce compteur devra être partagé (par exemple Redis).
+Une requête refusée reçoit `429` et `Retry-After`. Le store est en mémoire et les buckets expirés sont purgés périodiquement pour éviter une croissance permanente avec des IP one-shot. Cette approche reste adaptée au Compose C2 à une instance. Si plusieurs instances du Gateway sont déployées plus tard, ce compteur devra être partagé (par exemple Redis).
 
 ## CORS
 

@@ -9,7 +9,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node --env-file-if-exists=.env ./node_modules/@nestjs/cli/bin/nest.js start",
     "start:dev": "node --env-file-if-exists=.env ./node_modules/@nestjs/cli/bin/nest.js start --watch",
-    "start:prod": "node dist/src/main",
+    "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
