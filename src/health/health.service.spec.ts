@@ -71,6 +71,20 @@ describe('HealthService', () => {
     }
   });
 
+  it('keeps a 2xx verdict when cancelling the body fails', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation(() => {
+      const response = new Response('body', { status: 200 });
+      jest
+        .spyOn(response.body as ReadableStream, 'cancel')
+        .mockRejectedValue(new Error('socket hang up'));
+      return Promise.resolve(response);
+    });
+
+    const report = await new HealthService(config).checkUpstreams();
+
+    expect(report.status).toBe('ok');
+  });
+
   it('handles an upstream response without a body', async () => {
     jest
       .spyOn(global, 'fetch')

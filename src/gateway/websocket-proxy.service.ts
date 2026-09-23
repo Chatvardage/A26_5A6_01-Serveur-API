@@ -3,7 +3,7 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import { Duplex } from 'node:stream';
 import { GatewayConfigService } from './gateway-config.service';
-import { HOP_BY_HOP_HEADERS } from './proxy-headers';
+import { firstHeader, HOP_BY_HOP_HEADERS } from './proxy-headers';
 import { isSocketIoPath } from './proxy-routing';
 
 @Injectable()
@@ -165,14 +165,13 @@ export class WebSocketProxyService implements OnModuleDestroy {
 
     const remoteAddress = request.socket?.remoteAddress ?? 'unknown';
     const existingForwardedFor = this.config.trustProxy
-      ? this.firstHeader(request.headers['x-forwarded-for'])
+      ? firstHeader(request.headers['x-forwarded-for'])
       : undefined;
     const socketWithTls = request.socket as
       (typeof request.socket & { encrypted?: boolean }) | undefined;
     const localProtocol = socketWithTls?.encrypted === true ? 'https' : 'http';
     const forwardedProtocol = this.config.trustProxy
-      ? (this.firstHeader(request.headers['x-forwarded-proto']) ??
-        localProtocol)
+      ? (firstHeader(request.headers['x-forwarded-proto']) ?? localProtocol)
       : localProtocol;
 
     headers.host = targetHost;
@@ -180,14 +179,8 @@ export class WebSocketProxyService implements OnModuleDestroy {
       ? `${existingForwardedFor}, ${remoteAddress}`
       : remoteAddress;
     headers['x-forwarded-proto'] = forwardedProtocol;
-    headers['x-forwarded-host'] = this.firstHeader(request.headers.host) ?? '';
+    headers['x-forwarded-host'] = firstHeader(request.headers.host) ?? '';
     return headers;
-  }
-
-  private firstHeader(
-    value: string | string[] | undefined,
-  ): string | undefined {
-    return Array.isArray(value) ? value[0] : value;
   }
 
   private serializeUpgradeResponse(response: http.IncomingMessage): string {

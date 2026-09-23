@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
-import { HOP_BY_HOP_HEADERS } from './proxy-headers';
+import { firstHeader, HOP_BY_HOP_HEADERS } from './proxy-headers';
 import {
   isRateLimitedAuthRoute,
   resolveUpstream,
@@ -205,7 +205,7 @@ export class HttpProxyService {
     request: Request,
     response: Response,
   ): Promise<string | null> {
-    const authorization = this.firstHeader(request.headers.authorization);
+    const authorization = firstHeader(request.headers.authorization);
     const headers = new Headers();
     if (authorization) {
       headers.set('Authorization', authorization);
@@ -282,7 +282,7 @@ export class HttpProxyService {
 
     const remoteAddress = request.socket.remoteAddress ?? 'unknown';
     const existingForwardedFor = this.config.trustProxy
-      ? this.firstHeader(request.headers['x-forwarded-for'])
+      ? firstHeader(request.headers['x-forwarded-for'])
       : undefined;
     headers.set(
       'x-forwarded-for',
@@ -293,7 +293,7 @@ export class HttpProxyService {
     headers.set(
       'x-forwarded-proto',
       this.config.trustProxy
-        ? (this.firstHeader(request.headers['x-forwarded-proto']) ??
+        ? (firstHeader(request.headers['x-forwarded-proto']) ??
             request.protocol)
         : request.protocol,
     );
@@ -418,7 +418,7 @@ export class HttpProxyService {
       // Seule la dernière adresse est ajoutée par le reverse proxy de
       // confiance; les précédentes proviennent du client et sont forgeables.
       const forwardedFor = (
-        this.firstHeader(request.headers['x-forwarded-for']) ?? ''
+        firstHeader(request.headers['x-forwarded-for']) ?? ''
       )
         .split(',')
         .map((entry) => entry.trim())
@@ -429,14 +429,5 @@ export class HttpProxyService {
     }
 
     return request.socket.remoteAddress ?? 'unknown';
-  }
-
-  private firstHeader(
-    value: string | string[] | undefined,
-  ): string | undefined {
-    if (Array.isArray(value)) {
-      return value[0];
-    }
-    return value;
   }
 }

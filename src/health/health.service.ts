@@ -44,10 +44,13 @@ export class HealthService {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(this.config.proxyTimeoutMs),
       });
+      const health: UpstreamHealth = response.ok ? 'ok' : 'unavailable';
       // Sans lecture ni annulation du corps, undici garde la connexion
-      // occupée jusqu'au passage du ramasse-miettes.
-      await response.body?.cancel();
-      return response.ok ? 'ok' : 'unavailable';
+      // occupée jusqu'au passage du ramasse-miettes. Seul le statut HTTP
+      // compte : un échec d'annulation (connexion coupée juste après les
+      // en-têtes) ne change pas le verdict.
+      await response.body?.cancel().catch(() => undefined);
+      return health;
     } catch {
       return 'unavailable';
     }

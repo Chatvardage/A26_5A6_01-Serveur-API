@@ -297,7 +297,6 @@ describe('WebSocketProxyService', () => {
       'x-forwarded-host',
       'gateway.example',
     );
-    expect((service as any).firstHeader('single')).toBe('single');
   });
 
   it('uses HTTPS defaults and GET/default Socket.IO path when values are absent', () => {

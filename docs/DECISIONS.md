@@ -152,3 +152,27 @@ Ce fichier liste les recommandations de revue de code **volontairement non appli
 - Pour `x-forwarded-proto`, garder la première valeur est d'ailleurs le comportement voulu (le protocole vu par le premier proxy).
 
 **À revoir si** : le Gateway reçoit ses en-têtes d'une autre source que `node:http` (par exemple un adaptateur HTTP/2 ou une plateforme serverless qui exposerait des tableaux).
+
+---
+
+## D11 — Signalements de revue vérifiés et écartés
+
+Ces points ont été soulevés par des revues automatiques puis **infirmés par des essais réels** : Gateway compilé (`node dist/main`, Node 22) placé devant un faux service amont qui journalise ce qu'il reçoit. Ne pas les rouvrir sans nouvel élément.
+
+### D11.1 — « Un `DELETE` sans corps est transmis avec un corps vide et `Content-Length: 0` »
+
+- **Proposition** : restreindre `hasRequestBody()` à `POST`, `PUT` et `PATCH`.
+- **Constat** : un `DELETE` sans corps arrive en amont **sans** `Content-Length`, sans `Transfer-Encoding` et avec 0 octet, que le client passe par `fetch` ou par un socket brut. undici n'émet rien pour un `Buffer` vide sur ces méthodes.
+- **Décision** : pas de changement. La restriction proposée supprimerait en plus le corps d'un `DELETE` qui en porte un, contrairement à la règle 4 d'`AGENTS.md` (préserver les corps).
+
+### D11.2 — « Une réponse `429` sans lecture du corps désynchronise la connexion keep-alive »
+
+- **Proposition** : forcer `Connection: close` et `request.socket.destroySoon()` après le `429`.
+- **Constat** : sur **une seule** connexion keep-alive, la séquence login autorisé → login refusé → `GET /api/health` donne `200, 429, 200`. Quand la réponse se termine avant la lecture complète de la requête, Node lit et jette lui-même le reste du corps (`req._dump()`), ce qui garde le parseur HTTP synchronisé.
+- **Décision** : pas de changement. Fermer la connexion n'apporterait rien et forcerait le client à en rouvrir une.
+
+### D11.3 — « Le port `0` d'une URL amont est remplacé par le port 80 »
+
+- **Proposition** : remplacer `target.port || défaut` par une comparaison explicite à `''`.
+- **Constat** : `new URL('http://h:0/').port === '0'`. Une chaîne non vide est vraie en JavaScript : `||` conserve donc bien `'0'`. Seule la chaîne vide (aucun port dans l'URL) déclenche le port par défaut, ce qui est le comportement voulu.
+- **Décision** : pas de changement. Un port `0` n'aurait de toute façon aucun sens pour un service amont.
