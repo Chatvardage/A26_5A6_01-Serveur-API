@@ -469,7 +469,12 @@ describe('HttpProxyService', () => {
     await service.handle(
       request({
         url: '/api/config-utilisateur',
+        protocol: 'http',
+        remoteAddress: '10.0.0.20',
         headers: {
+          host: 'gateway.example',
+          'x-forwarded-for': '198.51.100.10',
+          'x-forwarded-proto': 'https',
           authorization: 'Bearer jwt-valid',
           'x-user-id': 'spoofed-user',
           'x-user-role': 'admin',
@@ -484,6 +489,11 @@ describe('HttpProxyService', () => {
       'http://auth:3001/api/auth/me',
     );
     const authHeaders = fetchSpy.mock.calls[0][1]?.headers as Headers;
+    expect(authHeaders.get('x-forwarded-for')).toBe('10.0.0.20');
+    expect(authHeaders.get('x-forwarded-proto')).toBe('http');
+    expect(authHeaders.get('x-forwarded-host')).toBe('gateway.example');
+    expect(authHeaders.get('x-user-id')).toBeNull();
+    expect(authHeaders.get('x-user-role')).toBeNull();
     expect(authHeaders.get('authorization')).toBe('Bearer jwt-valid');
 
     expect(requestTargetToString(fetchSpy.mock.calls[1][0])).toBe(
@@ -494,6 +504,38 @@ describe('HttpProxyService', () => {
     expect(configHeaders.get('x-user-id')).toBe('user-123');
     expect(configHeaders.get('x-user-role')).toBeNull();
     expect(state.statusCode).toBe(200);
+  });
+
+  it('preserves trusted forwarding metadata during User-Config authentication', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response('{"message":"non autorisé"}', { status: 401 }),
+      );
+    const service = new HttpProxyService(config({ trustProxy: true }), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res } = response();
+
+    await service.handle(
+      request({
+        url: '/api/config-utilisateur',
+        protocol: 'http',
+        remoteAddress: '10.0.0.20',
+        headers: {
+          host: 'gateway.example',
+          'x-forwarded-for': '198.51.100.10',
+          'x-forwarded-proto': 'https',
+        },
+      }),
+      res,
+      jest.fn(),
+    );
+
+    const authHeaders = fetchSpy.mock.calls[0][1]?.headers as Headers;
+    expect(authHeaders.get('x-forwarded-for')).toBe('198.51.100.10, 10.0.0.20');
+    expect(authHeaders.get('x-forwarded-proto')).toBe('https');
+    expect(authHeaders.get('x-forwarded-host')).toBe('gateway.example');
   });
 
   it('relays an Auth rejection without contacting User-Config', async () => {

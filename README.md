@@ -95,7 +95,7 @@ curl http://localhost:3000/api/config-utilisateur \
   -H "Authorization: Bearer <JWT>"
 ```
 
-Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service.
+Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service. Cet appel de validation reçoit les mêmes métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites que les requêtes proxy normales.
 
 ## Exemple Message REST
 
@@ -166,6 +166,8 @@ Le Gateway préserve les codes renvoyés par les services (`400`, `401`, `403`, 
 - `503` si une destination interne est injoignable;
 - `504` si une destination dépasse le timeout.
 
+`PROXY_TIMEOUT_MS` s’applique séparément à chaque phase d’entrée/sortie, et non comme une échéance globale de la requête. Une requête avec un corps lent suivie d’un service lent peut donc approcher deux fois cette durée. Une requête User-Config avec corps peut approcher trois fois cette durée : réception du corps, validation auprès d’Auth-Service, puis appel à User-Config-Service.
+
 ## Healthchecks
 
 ```bash
@@ -218,7 +220,7 @@ Le Compose global d’Infra contient maintenant cette intégration.
 | `ROOM_SERVICE_URL` | `http://localhost:3003` | Room-Service |
 | `MESSAGE_SERVICE_URL` | `http://localhost:3004` | Message-Service |
 | `USER_CONFIG_SERVICE_URL` | `http://localhost:3005` | User-Config-Service |
-| `PROXY_TIMEOUT_MS` | `5000` | délai HTTP/WS interne et délai max de réception du corps client |
+| `PROXY_TIMEOUT_MS` | `5000` | délai par phase HTTP/WS interne et délai max de réception du corps client |
 | `MAX_PROXY_BODY_BYTES` | `1048576` | corps max bufferisé |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | `60000` | fenêtre rate-limit Auth |
 | `AUTH_RATE_LIMIT_MAX` | `10` | requêtes max par IP/route/fenêtre |

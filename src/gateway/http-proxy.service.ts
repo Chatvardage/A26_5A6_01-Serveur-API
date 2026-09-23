@@ -210,6 +210,7 @@ export class HttpProxyService {
     if (authorization) {
       headers.set('Authorization', authorization);
     }
+    this.applyForwardingMetadata(request, headers);
 
     const authResponse = await fetch(
       new URL('/api/auth/me', this.config.authServiceUrl),
@@ -280,6 +281,16 @@ export class HttpProxyService {
       );
     }
 
+    this.applyForwardingMetadata(request, headers);
+
+    if (authenticatedUserId) {
+      headers.set('x-user-id', authenticatedUserId);
+    }
+
+    return headers;
+  }
+
+  private applyForwardingMetadata(request: Request, headers: Headers): void {
     const remoteAddress = request.socket.remoteAddress ?? 'unknown';
     const existingForwardedFor = this.config.trustProxy
       ? firstHeader(request.headers['x-forwarded-for'])
@@ -298,12 +309,6 @@ export class HttpProxyService {
         : request.protocol,
     );
     headers.set('x-forwarded-host', request.get('host') ?? '');
-
-    if (authenticatedUserId) {
-      headers.set('x-user-id', authenticatedUserId);
-    }
-
-    return headers;
   }
 
   private copyResponseHeaders(

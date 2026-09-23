@@ -59,6 +59,8 @@ Toutes les routes de messages privés requièrent le JWT selon le contrat de Mes
 
 Le client n’envoie jamais une identité de confiance. Le Gateway supprime les en-têtes entrants `x-user-id` et `x-user-role`, appelle `GET /api/auth/me` avec le Bearer reçu, puis transmet à User-Config un `x-user-id` dérivé de l’utilisateur Auth validé. Une erreur Auth est relayée avec son code d’origine.
 
+La validation préalable des routes User-Config transmet à Auth-Service les métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites par le Gateway. Les valeurs entrantes ne sont honorées que lorsque `TRUST_PROXY=true`.
+
 ## Socket.IO
 
 Le client se connecte au Gateway :
@@ -113,6 +115,8 @@ Retourne `200` si tous répondent avec un statut HTTP 2xx, sinon `503` et `statu
 - `504 Gateway Timeout` : délai `PROXY_TIMEOUT_MS` dépassé.
 
 Un client qui n'a pas fini d'envoyer son corps de requête après `PROXY_TIMEOUT_MS` voit sa connexion fermée sans réponse HTTP (voir `docs/DECISIONS.md`, D3).
+
+`PROXY_TIMEOUT_MS` est un délai par phase, pas une échéance globale. Une requête avec corps peut cumuler la phase de réception et l’appel au service interne. Pour User-Config, un appel avec corps peut en cumuler trois : réception, validation Auth, puis appel User-Config (voir `docs/DECISIONS.md`, D12).
 
 Toutes les réponses du Gateway portent `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` et `Referrer-Policy: strict-origin-when-cross-origin`, sauf si le service interne fournit lui-même ces en-têtes.
 

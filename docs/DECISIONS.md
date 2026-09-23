@@ -176,3 +176,52 @@ Ces points ont été soulevés par des revues automatiques puis **infirmés par 
 - **Proposition** : remplacer `target.port || défaut` par une comparaison explicite à `''`.
 - **Constat** : `new URL('http://h:0/').port === '0'`. Une chaîne non vide est vraie en JavaScript : `||` conserve donc bien `'0'`. Seule la chaîne vide (aucun port dans l'URL) déclenche le port par défaut, ce qui est le comportement voulu.
 - **Décision** : pas de changement. Un port `0` n'aurait de toute façon aucun sens pour un service amont.
+
+---
+
+## D12 — `PROXY_TIMEOUT_MS` est appliqué par phase
+
+**Recommandation reçue** : transformer `PROXY_TIMEOUT_MS` en échéance globale afin d'éviter le cumul du délai de lecture du corps et des appels internes.
+
+**Décision** : non appliquée; la sémantique par phase est conservée et documentée.
+
+**Justification** :
+
+- Le délai protège des opérations distinctes : réception du corps client, appel Auth préalable à User-Config et appel au service métier.
+- Une échéance globale ferait dépendre le temps accordé au service amont de la vitesse d'envoi du client et demanderait de propager un budget restant entre les opérations.
+- Les clients prévus envoient de petits corps JSON; le cumul maximal est donc un cas dégradé, pas le chemin normal.
+- Une requête avec corps peut approcher deux fois le délai. Une requête User-Config avec corps peut en approcher trois fois.
+
+**À revoir si** : un SLO de latence de bout en bout est défini pour le Gateway.
+
+---
+
+## D13 — L'écouteur d'erreur client reste actif lors d'un refus d'upgrade WebSocket
+
+**Recommandation reçue** : retirer `onClientErrorBeforeUpgrade` lorsque l'amont répond en HTTP classique au lieu d'établir le tunnel.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- Pendant le relais de la réponse HTTP de refus, le socket client peut encore émettre une erreur. Sans écouteur, cette erreur non gérée peut arrêter le processus Node.
+- L'écouteur détruit alors la requête amont, ce qui est le nettoyage attendu si le client disparaît.
+- Le socket est fermé à la fin de cette réponse (`Connection: close`). L'écouteur devient alors collectable avec le socket et ne constitue pas une fuite durable.
+
+**À revoir si** : les réponses HTTP de refus sont relayées par une abstraction qui possède explicitement le cycle de vie des deux flux.
+
+---
+
+## D14 — Le quota Auth reste indépendant par route
+
+**Recommandation reçue** : partager un seul quota entre `POST /api/auth/login` et `POST /api/auth/register` afin qu'une adresse IP ne puisse pas consommer deux quotas dans une même fenêtre.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- Le contrat actuel est explicitement un quota par IP **et par route**, documenté dans `README.md` et `.env.example`.
+- Les deux opérations ont des usages légitimes distincts. Un quota commun permettrait à un trafic de création de comptes de bloquer les connexions, ou inversement, notamment derrière un NAT.
+- Les deux routes coûteuses sont déjà limitées; doubler au plus le nombre d'opérations possibles par fenêtre est un compromis assumé pour éviter ce couplage.
+
+**À revoir si** : des métriques montrent une saturation Argon2 coordonnée sur les deux routes. Envisager alors des quotas séparés plus bas ou un second plafond agrégé.
