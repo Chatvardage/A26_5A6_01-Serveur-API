@@ -50,6 +50,14 @@ Toute nouvelle famille de routes doit être ajoutée explicitement; ne jamais tr
 - `AUTH_RATE_LIMIT_*` limite les calculs Argon2 déclenchés par les routes publiques d'Auth.
 - Une erreur réseau interne ne doit pas exposer l'URL, la stack ou les détails du réseau au client.
 
+## Limites connues
+
+Les recommandations de revue volontairement non appliquées et leur justification sont consignées dans `docs/DECISIONS.md`. Le consulter avant de rouvrir un de ces sujets.
+
+- Les corps de requête et de réponse sont entièrement bufferisés en mémoire. Le Gateway n'est pas prévu pour transférer de gros fichiers : toute route d'upload/export devra passer en streaming.
+- Seul le corps entrant est borné (`MAX_PROXY_BODY_BYTES`). Les réponses des services internes ne le sont pas : ils sont considérés comme de confiance.
+- Le rate limit est en mémoire, par instance. Avec plusieurs instances du Gateway, chacune a ses propres compteurs; un rate limit distribué exigerait un store partagé (Redis), hors du périmètre de ce dépôt (règle 8).
+
 ## Tests obligatoires avant PR
 
 ```bash
@@ -81,4 +89,4 @@ Le Gateway écoute sur `3000`. Les services internes peuvent rester liés à `12
 
 ## Documentation
 
-Tout changement de route, variable d'environnement, timeout, CORS, rate limit ou comportement de proxy doit mettre à jour `README.md`, `.env.example`, `docs/API.md` et ce fichier si la règle de travail change.
+Tout changement de route, variable d'environnement, timeout, CORS, rate limit ou comportement de proxy doit mettre à jour `README.md`, `.env.example`, `docs/API.md` et ce fichier si la règle de travail change. Toute recommandation de revue écartée doit être ajoutée à `docs/DECISIONS.md` avec sa justification.

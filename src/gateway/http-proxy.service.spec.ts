@@ -168,6 +168,11 @@ describe('HttpProxyService', () => {
       'Authorization,Content-Type',
     );
     expect(state.headers.get('access-control-max-age')).toBe('600');
+    expect(state.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(state.headers.get('x-frame-options')).toBe('DENY');
+    expect(state.headers.get('referrer-policy')).toBe(
+      'strict-origin-when-cross-origin',
+    );
   });
 
   it('does not emit CORS allow headers for a disallowed origin', async () => {

@@ -43,6 +43,7 @@ export class HttpProxyService {
     const upstream = resolveUpstream(requestUrl.pathname);
 
     this.applyCors(request, response);
+    this.applySecurityHeaders(response);
 
     if (request.method === 'OPTIONS' && upstream !== null) {
       response.status(204).end();
@@ -390,6 +391,14 @@ export class HttpProxyService {
       'Authorization,Content-Type',
     );
     response.setHeader('Access-Control-Max-Age', '600');
+  }
+
+  // Défense en profondeur côté navigateur : les services internes ne posent pas
+  // ces en-têtes. Un service qui les fournit lui-même garde la priorité.
+  private applySecurityHeaders(response: Response): void {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   }
 
   private mergeVaryHeader(response: Response, value: string): void {

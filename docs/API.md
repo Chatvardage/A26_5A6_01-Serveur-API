@@ -110,4 +110,8 @@ Retourne `200` si tous répondent avec un statut HTTP 2xx, sinon `503` et `statu
 - `503 Service Unavailable` : service interne injoignable.
 - `504 Gateway Timeout` : délai `PROXY_TIMEOUT_MS` dépassé.
 
+Un client qui n'a pas fini d'envoyer son corps de requête après `PROXY_TIMEOUT_MS` voit sa connexion fermée sans réponse HTTP (voir `docs/DECISIONS.md`, D3).
+
+Toutes les réponses du Gateway portent `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` et `Referrer-Policy: strict-origin-when-cross-origin`, sauf si le service interne fournit lui-même ces en-têtes.
+
 Toutes les erreurs fonctionnelles renvoyées par Auth/Room/Message/User-Config sont transmises avec leur code d'origine. Lors de l'accès à User-Config, une réponse de refus d'Auth est également relayée telle quelle.

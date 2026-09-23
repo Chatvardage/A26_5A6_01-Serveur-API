@@ -49,7 +49,7 @@ Le chemin et la query string restent inchangés.
 
 ## Installation locale
 
-Prérequis : Node.js 22 ou plus récent. Le projet reste volontairement compilé en CommonJS (`module: commonjs`) pour rester cohérent avec NestJS, Jest/ts-jest et les fichiers de configuration CommonJS du dépôt.
+Prérequis : Node.js 22.9 ou plus récent (`--env-file-if-exists` dans `npm start`) et Docker Engine 25 ou plus récent (`HEALTHCHECK --start-interval`). Le projet reste volontairement compilé en CommonJS (`module: commonjs`) pour rester cohérent avec NestJS, Jest/ts-jest et les fichiers de configuration CommonJS du dépôt.
 
 ```bash
 cp .env.example .env

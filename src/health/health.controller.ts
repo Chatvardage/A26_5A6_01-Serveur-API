@@ -1,6 +1,6 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { HealthService } from './health.service';
+import { GatewayHealthReport, HealthService } from './health.service';
 
 @Controller('api/health')
 export class HealthController {
@@ -16,7 +16,9 @@ export class HealthController {
   }
 
   @Get('upstreams')
-  async upstreams(@Res({ passthrough: true }) response: Response) {
+  async upstreams(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<GatewayHealthReport> {
     const report = await this.health.checkUpstreams();
     response.status(report.status === 'ok' ? 200 : 503);
     return report;
