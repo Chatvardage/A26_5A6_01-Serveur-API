@@ -27,21 +27,21 @@ function upstreamRequest(): FakeRequest {
   });
 }
 
-function socket(destroyed = false): Duplex & {
+type FakeSocket = Duplex & {
   write: jest.Mock;
   end: jest.Mock;
   pipe: jest.Mock;
-} {
-  return {
+  destroy: jest.Mock;
+};
+
+function socket(destroyed = false): FakeSocket {
+  return Object.assign(new EventEmitter(), {
     destroyed,
     write: jest.fn().mockReturnValue(true),
     end: jest.fn(),
     pipe: jest.fn().mockReturnValue(undefined),
-  } as unknown as Duplex & {
-    write: jest.Mock;
-    end: jest.Mock;
-    pipe: jest.Mock;
-  };
+    destroy: jest.fn(),
+  }) as unknown as FakeSocket;
 }
 
 describe('WebSocketProxyService', () => {
@@ -118,6 +118,11 @@ describe('WebSocketProxyService', () => {
         'x-forwarded-for': '1.2.3.4',
         'x-forwarded-proto': 'https',
         'x-forwarded-host': 'evil.example',
+        connection: 'Upgrade',
+        upgrade: 'websocket',
+        'proxy-authorization': 'Basic secret',
+        te: 'trailers',
+        'keep-alive': 'timeout=5',
         'x-optional': undefined,
       },
       socket: { remoteAddress: '10.0.0.5' },
@@ -136,12 +141,17 @@ describe('WebSocketProxyService', () => {
         headers: expect.objectContaining({
           host: 'message-service:3004',
           origin: 'http://localhost:5173',
+          connection: 'Upgrade',
+          upgrade: 'websocket',
         }),
       }),
     );
     const requestOptions = requestSpy.mock.calls[0][0] as http.RequestOptions;
     expect(requestOptions.headers).not.toHaveProperty('x-user-id');
     expect(requestOptions.headers).not.toHaveProperty('x-user-role');
+    expect(requestOptions.headers).not.toHaveProperty('proxy-authorization');
+    expect(requestOptions.headers).not.toHaveProperty('te');
+    expect(requestOptions.headers).not.toHaveProperty('keep-alive');
     expect(requestOptions.headers).toHaveProperty(
       'x-forwarded-for',
       '10.0.0.5',
@@ -184,6 +194,73 @@ describe('WebSocketProxyService', () => {
     ]);
     expect(upstream.pipe.mock.calls).toEqual([[client]]);
     expect(client.pipe.mock.calls).toEqual([[upstream]]);
+  });
+
+  it('tears down both sides when either socket errors after the upgrade', () => {
+    const req = upstreamRequest();
+    const service = new WebSocketProxyService(config());
+    (service as any).httpRequest = jest.fn().mockReturnValue(req);
+    const client = socket();
+    const upstream = socket();
+
+    (service as any).proxyUpgrade(
+      { method: 'GET', url: '/socket.io/', headers: {} },
+      client,
+      Buffer.alloc(0),
+    );
+    req.emit(
+      'upgrade',
+      { statusCode: 101, headers: {} },
+      upstream,
+      Buffer.alloc(0),
+    );
+
+    client.emit('error', new Error('ECONNRESET'));
+    expect(upstream.destroy.mock.calls).toHaveLength(1);
+
+    upstream.emit('error', new Error('ECONNRESET'));
+    expect(client.destroy.mock.calls).toHaveLength(1);
+  });
+
+  it('aborts the upstream request when the client errors before the upgrade', () => {
+    const req = upstreamRequest();
+    const service = new WebSocketProxyService(config());
+    (service as any).httpRequest = jest.fn().mockReturnValue(req);
+    const client = socket();
+
+    (service as any).proxyUpgrade(
+      { method: 'GET', url: '/socket.io/', headers: {} },
+      client,
+      Buffer.alloc(0),
+    );
+    client.emit('error', new Error('ECONNRESET'));
+
+    expect(req.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the upstream socket when the client left before the upgrade', () => {
+    const req = upstreamRequest();
+    const service = new WebSocketProxyService(config());
+    (service as any).httpRequest = jest.fn().mockReturnValue(req);
+    const client = socket(true);
+    const upstream = socket();
+
+    (service as any).proxyUpgrade(
+      { method: 'GET', url: '/socket.io/', headers: {} },
+      client,
+      Buffer.from('client-head'),
+    );
+    req.emit(
+      'upgrade',
+      { statusCode: 101, headers: {} },
+      upstream,
+      Buffer.from('upstream-head'),
+    );
+
+    expect(upstream.destroy.mock.calls).toHaveLength(1);
+    expect(client.write.mock.calls).toHaveLength(0);
+    expect(upstream.write.mock.calls).toHaveLength(0);
+    expect(upstream.pipe.mock.calls).toHaveLength(0);
   });
 
   it('honors an existing X-Forwarded-For chain only when trustProxy is enabled', () => {

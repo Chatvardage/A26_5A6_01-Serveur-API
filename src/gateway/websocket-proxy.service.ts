@@ -3,6 +3,7 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import { Duplex } from 'node:stream';
 import { GatewayConfigService } from './gateway-config.service';
+import { HOP_BY_HOP_HEADERS } from './proxy-headers';
 import { isSocketIoPath } from './proxy-routing';
 
 @Injectable()
@@ -71,9 +72,27 @@ export class WebSocketProxyService implements OnModuleDestroy {
         ? this.httpsRequest(requestOptions)
         : this.httpRequest(requestOptions);
 
+    // Node retire ses propres écouteurs d'erreur des sockets lors d'un upgrade :
+    // sans ceux-ci, un simple ECONNRESET ferait tomber le processus.
+    clientSocket.on('error', () => {
+      upstreamRequest.destroy();
+    });
+
     upstreamRequest.on(
       'upgrade',
       (upstreamResponse, upstreamSocket, upstreamHead) => {
+        upstreamSocket.on('error', () => {
+          clientSocket.destroy();
+        });
+
+        if (clientSocket.destroyed) {
+          upstreamSocket.destroy();
+          return;
+        }
+
+        clientSocket.on('error', () => {
+          upstreamSocket.destroy();
+        });
         clientSocket.write(this.serializeUpgradeResponse(upstreamResponse));
 
         if (upstreamHead.length > 0) {
@@ -119,6 +138,10 @@ export class WebSocketProxyService implements OnModuleDestroy {
       const lowerName = name.toLowerCase();
       if (
         value === undefined ||
+        // Connection/Upgrade portent la poignée de main WebSocket elle-même.
+        (HOP_BY_HOP_HEADERS.has(lowerName) &&
+          lowerName !== 'connection' &&
+          lowerName !== 'upgrade') ||
         lowerName === 'host' ||
         lowerName === 'x-user-id' ||
         lowerName === 'x-user-role' ||

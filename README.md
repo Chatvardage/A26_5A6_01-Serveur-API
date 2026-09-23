@@ -218,7 +218,7 @@ Le Compose global d’Infra contient maintenant cette intégration.
 | `ROOM_SERVICE_URL` | `http://localhost:3003` | Room-Service |
 | `MESSAGE_SERVICE_URL` | `http://localhost:3004` | Message-Service |
 | `USER_CONFIG_SERVICE_URL` | `http://localhost:3005` | User-Config-Service |
-| `PROXY_TIMEOUT_MS` | `5000` | délai HTTP/WS interne |
+| `PROXY_TIMEOUT_MS` | `5000` | délai HTTP/WS interne et délai max de réception du corps client |
 | `MAX_PROXY_BODY_BYTES` | `1048576` | corps max bufferisé |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | `60000` | fenêtre rate-limit Auth |
 | `AUTH_RATE_LIMIT_MAX` | `10` | requêtes max par IP/route/fenêtre |

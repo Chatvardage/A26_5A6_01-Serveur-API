@@ -2,22 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
+import { HOP_BY_HOP_HEADERS } from './proxy-headers';
 import {
   isRateLimitedAuthRoute,
   resolveUpstream,
   UpstreamService,
 } from './proxy-routing';
-
-const HOP_BY_HOP_HEADERS = new Set([
-  'connection',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]);
 
 const UPSTREAM_CORS_HEADERS = new Set([
   'access-control-allow-origin',
@@ -30,6 +20,7 @@ const UPSTREAM_CORS_HEADERS = new Set([
 
 class PayloadTooLargeError extends Error {}
 class InvalidAuthContractError extends Error {}
+class RequestBodyTimeoutError extends Error {}
 
 @Injectable()
 export class HttpProxyService {
@@ -88,6 +79,12 @@ export class HttpProxyService {
     try {
       await this.forward(request, response, requestUrl, upstream);
     } catch (error: unknown) {
+      if (error instanceof RequestBodyTimeoutError) {
+        // La connexion du client lent est déjà fermée : aucune réponse possible.
+        this.logger.warn(`Corps de requête trop lent vers ${upstream}`);
+        return;
+      }
+
       if (response.headersSent) {
         response.end();
         return;
@@ -345,15 +342,24 @@ export class HttpProxyService {
 
     const chunks: Buffer[] = [];
     let total = 0;
+    // MAX_PROXY_BODY_BYTES borne le volume; ce délai borne le temps pendant
+    // lequel un client lent peut occuper la lecture du corps.
+    const deadline = setTimeout(() => {
+      request.destroy(new RequestBodyTimeoutError());
+    }, this.config.proxyTimeoutMs);
 
-    for await (const chunk of request) {
-      const buffer = Buffer.from(chunk as Uint8Array);
-      total += buffer.length;
-      if (total > this.config.maxProxyBodyBytes) {
-        request.resume();
-        throw new PayloadTooLargeError();
+    try {
+      for await (const chunk of request) {
+        const buffer = Buffer.from(chunk as Uint8Array);
+        total += buffer.length;
+        if (total > this.config.maxProxyBodyBytes) {
+          request.resume();
+          throw new PayloadTooLargeError();
+        }
+        chunks.push(buffer);
       }
-      chunks.push(buffer);
+    } finally {
+      clearTimeout(deadline);
     }
 
     return Buffer.concat(chunks);
@@ -398,9 +404,16 @@ export class HttpProxyService {
 
   private clientKey(request: Request): string {
     if (this.config.trustProxy) {
-      const forwardedFor = this.firstHeader(request.headers['x-forwarded-for']);
-      if (forwardedFor) {
-        return forwardedFor.split(',')[0].trim();
+      // Seule la dernière adresse est ajoutée par le reverse proxy de
+      // confiance; les précédentes proviennent du client et sont forgeables.
+      const forwardedFor = (
+        this.firstHeader(request.headers['x-forwarded-for']) ?? ''
+      )
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      if (forwardedFor.length > 0) {
+        return forwardedFor[forwardedFor.length - 1];
       }
     }
 

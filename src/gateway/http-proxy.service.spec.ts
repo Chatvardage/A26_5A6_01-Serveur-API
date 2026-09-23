@@ -612,7 +612,9 @@ describe('HttpProxyService', () => {
       jest.fn(),
     );
 
-    expect(consume).toHaveBeenCalledWith('203.0.113.1|/api/auth/login');
+    // 203.0.113.1 a pu être forgé par le client; seule la dernière entrée
+    // provient du reverse proxy de confiance.
+    expect(consume).toHaveBeenCalledWith('203.0.113.2|/api/auth/login');
     const headers = fetchSpy.mock.calls[0][1]?.headers as Headers;
     expect(headers.get('x-forwarded-for')).toBe(
       '203.0.113.1, 203.0.113.2, 10.0.0.10',
@@ -661,6 +663,49 @@ describe('HttpProxyService', () => {
     );
 
     expect(consume).toHaveBeenCalledWith('127.0.0.1|/api/auth/login');
+  });
+
+  it('falls back to the socket address when the forwarded chain is blank', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response('ok'));
+    const consume = jest.fn().mockReturnValue(allowedResult());
+    const service = new HttpProxyService(config({ trustProxy: true }), {
+      consume,
+    } as unknown as AuthRateLimitService);
+    const { response: res } = response();
+
+    await service.handle(
+      request({
+        method: 'POST',
+        url: '/api/auth/login',
+        headers: { 'x-forwarded-for': ' , ' },
+        body: '{}',
+      }),
+      res,
+      jest.fn(),
+    );
+
+    expect(consume).toHaveBeenCalledWith('127.0.0.1|/api/auth/login');
+  });
+
+  it('closes a client whose body is too slow without contacting the upstream', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const service = new HttpProxyService(config({ proxyTimeoutMs: 10 }), {
+      consume: jest.fn(),
+    } as unknown as AuthRateLimitService);
+    const { response: res, state } = response();
+    const slow = request({ method: 'POST', url: '/api/messages' });
+    // Flux qui ne se termine jamais : simule un client qui n'envoie plus rien.
+    const neverEnding = new Readable({ read: () => undefined });
+    Object.assign(slow, {
+      [Symbol.asyncIterator]: () => neverEnding[Symbol.asyncIterator](),
+      destroy: (error: Error) => neverEnding.destroy(error),
+    });
+
+    await service.handle(slow, res, jest.fn());
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(neverEnding.destroyed).toBe(true);
+    expect(state.ended).toBe(false);
   });
 
   it('rejects oversized bodies before contacting the upstream', async () => {

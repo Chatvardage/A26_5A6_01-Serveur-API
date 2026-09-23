@@ -44,9 +44,9 @@ Toute nouvelle famille de routes doit être ajoutée explicitement; ne jamais tr
 
 ## Sécurité
 
-- `TRUST_PROXY=false` par défaut. Ne l'activer que derrière un reverse proxy contrôlé. Les proxies HTTP et WebSocket reconstruisent `x-forwarded-for` et n'honorent la chaîne entrante que lorsque cette option est activée.
+- `TRUST_PROXY=false` par défaut. Ne l'activer que derrière un reverse proxy contrôlé. Les proxies HTTP et WebSocket reconstruisent `x-forwarded-for` et n'honorent la chaîne entrante que lorsque cette option est activée. Le rate limit utilise alors la dernière adresse de `X-Forwarded-For` (ajoutée par le reverse proxy), jamais la première (forgeable).
 - `CORS_ORIGINS` est une liste blanche exacte.
-- `MAX_PROXY_BODY_BYTES` borne ce que le Gateway bufferise avant transfert.
+- `MAX_PROXY_BODY_BYTES` borne ce que le Gateway bufferise avant transfert; `PROXY_TIMEOUT_MS` borne aussi la durée de lecture du corps (client lent = connexion fermée).
 - `AUTH_RATE_LIMIT_*` limite les calculs Argon2 déclenchés par les routes publiques d'Auth.
 - Une erreur réseau interne ne doit pas exposer l'URL, la stack ou les détails du réseau au client.
 
