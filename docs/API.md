@@ -106,7 +106,7 @@ Retourne `200` si tous répondent avec un statut HTTP 2xx, sinon `503` et `statu
 
 - `413 Payload Too Large` : corps au-dessus de `MAX_PROXY_BODY_BYTES`.
 - `429 Too Many Requests` : limite de login/register atteinte.
-- `502 Bad Gateway` : réponse Auth 2xx dont le contrat d'identité est invalide lors d'un accès User-Config.
+- `502 Bad Gateway` : réponse Auth 2xx dont le contrat d'identité est invalide lors d'un accès User-Config (`id` absent, vide, de plus de 255 caractères ou contenant un caractère de contrôle comme CR/LF).
 - `503 Service Unavailable` : service interne injoignable.
 - `504 Gateway Timeout` : délai `PROXY_TIMEOUT_MS` dépassé.
 

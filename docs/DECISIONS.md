@@ -71,3 +71,52 @@ Ce fichier liste les recommandations de revue de code **volontairement non appli
 **Justification** : le déploiement prévu (Docker Compose d'`Infra`) exécute une seule instance du Gateway. Un store partagé impliquerait de brancher le Gateway sur Redis, ce que la règle 8 d'`AGENTS.md` interdit dans ce dépôt.
 
 **À revoir si** : le Gateway est déployé en plusieurs réplicas.
+
+---
+
+## D6 — Pas d'`Access-Control-Allow-Credentials`
+
+**Recommandation reçue** : émettre `Access-Control-Allow-Credentials: true`, au motif que les clients envoyant un en-tête `Authorization` seraient bloqués par le navigateur.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- Un en-tête `Authorization` posé explicitement par le code client **ne nécessite pas** `credentials: 'include'`. Il est couvert par `Access-Control-Allow-Headers: Authorization,Content-Type`, déjà émis. Le mode `credentials` ne concerne que les cookies et l'authentification HTTP gérée par le navigateur.
+- Auth-Service ne pose aucun cookie, et ni le Frontend ni le Dashboard n'utilisent `credentials` / `withCredentials`.
+- Activer cet en-tête autoriserait des requêtes cross-origin porteuses de cookies sans aucun besoin : surface d'attaque (CSRF) ajoutée pour rien.
+
+**À revoir si** : l'authentification passe à un cookie de session (HttpOnly). Il faudra alors émettre cet en-tête **et** ajouter une protection CSRF.
+
+---
+
+## D7 — Rate limit sur une liste explicite de routes
+
+**Recommandation reçue** : inverser la logique (limiter toutes les routes `POST /api/auth/*` sauf exclusions), pour qu'une nouvelle route Auth ne soit pas non protégée par défaut.
+
+**Décision** : non appliquée ; règle 6 d'`AGENTS.md` complétée.
+
+**Justification** :
+
+- Les seules routes `POST` sous `/api/auth` d'Auth-Service sont aujourd'hui `register` et `login` (`src/interface/http/routes.rs`), toutes deux limitées. L'inversion ne changerait rien au comportement actuel.
+- Le rate limit est indexé par IP. Appliqué par défaut à de futures routes authentifiées fréquentes (ex. refresh de jeton), il bloquerait des utilisateurs légitimes partageant une IP (NAT d'un réseau de classe ou d'entreprise).
+- Le rate limit vise les routes **publiques** coûteuses (Argon2). Les routes authentifiées sont protégées par le Bearer, validé par Auth-Service.
+
+**À revoir si** : Auth-Service ajoute plusieurs routes publiques. Envisager alors un préfixe dédié (ex. `/api/auth/public/*`) limité en bloc.
+
+---
+
+## D8 — Origine CORS `null` acceptée si configurée
+
+**Contexte** : `CORS_ORIGINS` accepte la valeur littérale `null`, pour une application Electron packagée qui charge ses pages en `file://` (`loadFile`).
+
+**Décision** : conservée, **désactivée par défaut** (`CORS_ORIGINS=http://localhost:5173` dans `.env.example` et dans le Compose d'`Infra`).
+
+**Justification et conditions d'usage** :
+
+- Les navigateurs envoient aussi `Origin: null` pour les pages ouvertes depuis `file://`, les iframes `sandbox` et certaines redirections. Autoriser `null` revient à autoriser **toutes** ces sources, dont une page piégée.
+- Le risque reste borné : le Gateway n'émet pas `Access-Control-Allow-Credentials` (D6), et un attaquant doit disposer d'un Bearer valide pour atteindre les routes protégées.
+- Usage acceptable : poste local ou déploiement où le Gateway n'est joignable que par l'application Electron. **Jamais** sur un Gateway exposé publiquement à des navigateurs.
+- Une application Electron qui appelle l'API depuis le processus principal n'envoie pas d'en-tête `Origin` et n'a pas besoin de `null`.
+
+**À revoir si** : le Frontend est servi par un protocole personnalisé (ex. `app://`), qui fournit une origine précise à inscrire dans `CORS_ORIGINS` à la place de `null`.

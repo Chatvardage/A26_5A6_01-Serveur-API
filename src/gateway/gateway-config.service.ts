@@ -26,12 +26,13 @@ function positiveInteger(
   }
 
   const normalized = raw.trim();
-  if (!/^\d+$/.test(normalized)) {
+  // Refuse aussi les zéros initiaux ("0080") : souvent une faute de frappe.
+  if (!/^[1-9]\d*$/.test(normalized)) {
     throw new Error(`${name} doit être un entier positif : "${raw}"`);
   }
 
   const value = Number(normalized);
-  if (!Number.isSafeInteger(value) || value <= 0) {
+  if (!Number.isSafeInteger(value)) {
     throw new Error(`${name} doit être un entier positif : "${raw}"`);
   }
 

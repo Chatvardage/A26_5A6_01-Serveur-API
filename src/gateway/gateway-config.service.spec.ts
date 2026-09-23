@@ -89,6 +89,7 @@ describe('resolveGatewayConfig', () => {
 
   it.each([
     ['PORT', 'abc'],
+    ['PORT', '0080'],
     ['PROXY_TIMEOUT_MS', '0'],
     ['MAX_PROXY_BODY_BYTES', '-1'],
     ['AUTH_RATE_LIMIT_WINDOW_MS', '1.5'],

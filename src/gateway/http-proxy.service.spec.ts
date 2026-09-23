@@ -529,6 +529,8 @@ describe('HttpProxyService', () => {
     ['non-string id', { id: 42 }],
     ['blank id', { id: '   ' }],
     ['oversized id', { id: 'a'.repeat(256) }],
+    ['CRLF in id', { id: 'user-1\r\nx-user-role: admin' }],
+    ['control character in id', { id: 'user\u00001' }],
   ])(
     'returns 502 when Auth returns an invalid identity payload: %s',
     async (_caseName, payload) => {

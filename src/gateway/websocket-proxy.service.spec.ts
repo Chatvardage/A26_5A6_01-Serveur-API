@@ -215,8 +215,11 @@ describe('WebSocketProxyService', () => {
       Buffer.alloc(0),
     );
 
+    // L'écouteur pré-upgrade a été retiré : il n'en reste qu'un seul.
+    expect(client.listenerCount('error')).toBe(1);
     client.emit('error', new Error('ECONNRESET'));
     expect(upstream.destroy.mock.calls).toHaveLength(1);
+    expect(req.destroy.mock.calls).toHaveLength(0);
 
     upstream.emit('error', new Error('ECONNRESET'));
     expect(client.destroy.mock.calls).toHaveLength(1);
@@ -379,7 +382,12 @@ describe('WebSocketProxyService', () => {
     const upstreamResponse = Object.assign(new EventEmitter(), {
       statusCode: undefined,
       statusMessage: undefined,
-      headers: { 'content-type': 'text/plain' },
+      headers: {
+        'content-type': 'text/plain',
+        'transfer-encoding': 'chunked',
+        connection: 'keep-alive',
+        'keep-alive': 'timeout=5',
+      },
       pipe: jest.fn(),
     });
 
@@ -394,10 +402,36 @@ describe('WebSocketProxyService', () => {
     );
     req.emit('response', upstreamResponse);
 
-    expect(String(client.write.mock.calls[0][0])).toContain(
-      'HTTP/1.1 502 Bad Gateway',
+    const head = String(client.write.mock.calls[0][0]);
+    expect(head).toBe(
+      'HTTP/1.1 502 Bad Gateway\r\ncontent-type: text/plain\r\nconnection: close\r\n\r\n',
     );
     expect(upstreamResponse.pipe).toHaveBeenCalledWith(client);
+  });
+
+  it('drains a non-upgrade response when the client already left', () => {
+    const req = upstreamRequest();
+    const service = new WebSocketProxyService(config());
+    (service as any).httpRequest = jest.fn().mockReturnValue(req);
+    const client = socket(true);
+    const upstreamResponse = Object.assign(new EventEmitter(), {
+      statusCode: 400,
+      statusMessage: 'Bad Request',
+      headers: {},
+      pipe: jest.fn(),
+      resume: jest.fn(),
+    });
+
+    (service as any).proxyUpgrade(
+      { method: 'GET', url: '/socket.io/', headers: {} },
+      client,
+      Buffer.alloc(0),
+    );
+    req.emit('response', upstreamResponse);
+
+    expect(client.write.mock.calls).toHaveLength(0);
+    expect(upstreamResponse.pipe).not.toHaveBeenCalled();
+    expect(upstreamResponse.resume).toHaveBeenCalledTimes(1);
   });
 
   it('destroys an upstream request on timeout', () => {
@@ -455,7 +489,9 @@ describe('WebSocketProxyService', () => {
       statusMessage: 'Bad Request',
       headers: {},
     });
-    expect(serialized).toBe('HTTP/1.1 400 Bad Request\r\n\r\n');
+    expect(serialized).toBe(
+      'HTTP/1.1 400 Bad Request\r\nconnection: close\r\n\r\n',
+    );
   });
 
   it('uses fallback 101 status text when upgrade response omits it', () => {

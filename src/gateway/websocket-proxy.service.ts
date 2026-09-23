@@ -74,9 +74,10 @@ export class WebSocketProxyService implements OnModuleDestroy {
 
     // Node retire ses propres écouteurs d'erreur des sockets lors d'un upgrade :
     // sans ceux-ci, un simple ECONNRESET ferait tomber le processus.
-    clientSocket.on('error', () => {
+    const onClientErrorBeforeUpgrade = () => {
       upstreamRequest.destroy();
-    });
+    };
+    clientSocket.on('error', onClientErrorBeforeUpgrade);
 
     upstreamRequest.on(
       'upgrade',
@@ -90,6 +91,8 @@ export class WebSocketProxyService implements OnModuleDestroy {
           return;
         }
 
+        // Une fois le tunnel établi, seul le socket amont doit être fermé.
+        clientSocket.off('error', onClientErrorBeforeUpgrade);
         clientSocket.on('error', () => {
           upstreamSocket.destroy();
         });
@@ -108,6 +111,11 @@ export class WebSocketProxyService implements OnModuleDestroy {
     );
 
     upstreamRequest.on('response', (upstreamResponse) => {
+      if (clientSocket.destroyed) {
+        upstreamResponse.resume();
+        return;
+      }
+
       clientSocket.write(this.serializeHttpResponse(upstreamResponse));
       upstreamResponse.pipe(clientSocket);
     });
@@ -191,12 +199,24 @@ export class WebSocketProxyService implements OnModuleDestroy {
     );
   }
 
+  // Refus d'upgrade relayé en HTTP classique. Le corps est déjà décodé par
+  // Node (plus de chunks) : les en-têtes hop-by-hop amont seraient faux, et la
+  // fin du corps est signalée par la fermeture du socket. La réponse 101, elle,
+  // doit garder Connection/Upgrade et n'est donc pas filtrée.
   private serializeHttpResponse(response: http.IncomingMessage): string {
     const statusCode = response.statusCode ?? 502;
     const statusMessage = response.statusMessage ?? 'Bad Gateway';
+    const headers: http.IncomingHttpHeaders = {};
+    for (const [name, value] of Object.entries(response.headers)) {
+      if (!HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
+        headers[name] = value;
+      }
+    }
+    headers.connection = 'close';
+
     return this.serializeHeaders(
       `HTTP/1.1 ${statusCode} ${statusMessage}`,
-      response.headers,
+      headers,
     );
   }
 

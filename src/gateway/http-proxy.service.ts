@@ -241,7 +241,10 @@ export class HttpProxyService {
       !('id' in payload) ||
       typeof payload.id !== 'string' ||
       payload.id.trim() === '' ||
-      payload.id.length > 255
+      payload.id.length > 255 ||
+      // Un CR/LF ferait échouer Headers.set (503 générique) : 502 explicite.
+      // eslint-disable-next-line no-control-regex -- détection voulue
+      /[\x00-\x1f\x7f]/.test(payload.id)
     ) {
       throw new InvalidAuthContractError('champ id absent ou invalide');
     }
