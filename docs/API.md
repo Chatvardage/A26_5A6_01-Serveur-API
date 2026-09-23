@@ -83,6 +83,8 @@ Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `
 
 Le Gateway applique une liste blanche exacte via `CORS_ORIGINS`. Les en-têtes `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers` et `Access-Control-Max-Age` sont ajoutés uniquement lorsque l’en-tête `Origin` reçu est autorisé.
 
+`Access-Control-Allow-Methods` vaut `GET,POST,PUT,PATCH,DELETE,OPTIONS`. Il doit couvrir toutes les méthodes listées dans ce document : toute route utilisant une nouvelle méthode HTTP doit l’y ajouter (`applyCors` dans `http-proxy.service.ts`), sinon le navigateur bloque la requête dès le preflight.
+
 Les en-têtes CORS fournis par un microservice amont sont supprimés afin que le Gateway reste l’unique autorité CORS. En revanche, un en-tête amont `Vary` est préservé et fusionné avec `Origin` lorsqu’une requête contient cet en-tête, afin de conserver les dimensions de cache telles que `Cookie` ou `Accept-Encoding`.
 
 ## Health

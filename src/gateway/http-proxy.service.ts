@@ -387,7 +387,7 @@ export class HttpProxyService {
     response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader(
       'Access-Control-Allow-Methods',
-      'GET,POST,PATCH,DELETE,OPTIONS',
+      'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     );
     response.setHeader(
       'Access-Control-Allow-Headers',

@@ -161,8 +161,10 @@ describe('HttpProxyService', () => {
       'http://localhost:5173',
     );
     expect(state.headers.get('vary')).toBe('Origin');
-    expect(state.headers.get('access-control-allow-methods')).toContain(
-      'PATCH',
+    // Valeur exacte : doit couvrir toutes les méthodes de docs/API.md
+    // (dont PUT /api/config-utilisateur/presence).
+    expect(state.headers.get('access-control-allow-methods')).toBe(
+      'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     );
     expect(state.headers.get('access-control-allow-headers')).toBe(
       'Authorization,Content-Type',

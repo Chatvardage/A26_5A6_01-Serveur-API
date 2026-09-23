@@ -120,3 +120,19 @@ Ce fichier liste les recommandations de revue de code **volontairement non appli
 - Une application Electron qui appelle l'API depuis le processus principal n'envoie pas d'en-tête `Origin` et n'a pas besoin de `null`.
 
 **À revoir si** : le Frontend est servi par un protocole personnalisé (ex. `app://`), qui fournit une origine précise à inscrire dans `CORS_ORIGINS` à la place de `null`.
+
+---
+
+## D9 — Les tests unitaires accèdent aux membres privés via `(service as any)`
+
+**Recommandation reçue** : injecter un client HTTP abstrait par le constructeur plutôt que de remplacer `httpRequest` / `httpsRequest` ou d'appeler des méthodes privées depuis les tests.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- L'abstraction n'aurait qu'un seul usage réel (`node:http` / `node:https`). Elle ajouterait un provider Nest, une interface et du câblage uniquement pour les tests.
+- La plomberie réseau réelle est vérifiée par les tests e2e (`test/app.e2e-spec.ts`), qui démarrent de vrais serveurs HTTP amont sans aucun accès aux membres privés.
+- Les tests unitaires servent surtout à couvrir des séquences difficiles à provoquer sur un vrai réseau (socket détruit juste avant l'upgrade, `ECONNRESET` après le tunnel, etc.), nécessaires au seuil de couverture de 100 %. Ce couplage à l'implémentation est accepté pour ces tests.
+
+**À revoir si** : un second transport ou client HTTP devient nécessaire (proxy sortant, mTLS, client instrumenté). L'injection se justifierait alors par le code de production, et les tests en profiteraient.
