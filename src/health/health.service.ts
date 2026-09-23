@@ -44,6 +44,9 @@ export class HealthService {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(this.config.proxyTimeoutMs),
       });
+      // Sans lecture ni annulation du corps, undici garde la connexion
+      // occupée jusqu'au passage du ramasse-miettes.
+      await response.body?.cancel();
       return response.ok ? 'ok' : 'unavailable';
     } catch {
       return 'unavailable';

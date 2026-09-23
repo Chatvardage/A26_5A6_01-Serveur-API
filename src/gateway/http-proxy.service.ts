@@ -357,7 +357,6 @@ export class HttpProxyService {
         const buffer = Buffer.from(chunk as Uint8Array);
         total += buffer.length;
         if (total > this.config.maxProxyBodyBytes) {
-          request.resume();
           throw new PayloadTooLargeError();
         }
         chunks.push(buffer);

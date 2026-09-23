@@ -136,3 +136,19 @@ Ce fichier liste les recommandations de revue de code **volontairement non appli
 - Les tests unitaires servent surtout à couvrir des séquences difficiles à provoquer sur un vrai réseau (socket détruit juste avant l'upgrade, `ECONNRESET` après le tunnel, etc.), nécessaires au seuil de couverture de 100 %. Ce couplage à l'implémentation est accepté pour ces tests.
 
 **À revoir si** : un second transport ou client HTTP devient nécessaire (proxy sortant, mTLS, client instrumenté). L'injection se justifierait alors par le code de production, et les tests en profiteraient.
+
+---
+
+## D10 — `firstHeader()` ne garde que la première valeur d'un en-tête tableau
+
+**Recommandation reçue** : joindre toutes les valeurs (`value.join(', ')`) au lieu de `value[0]`, au motif que plusieurs en-têtes `X-Forwarded-For` distincts seraient reçus sous forme de tableau et que la chaîne d'IP serait tronquée.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- Le constat de départ est inexact. Node fusionne lui-même les en-têtes répétés en une seule chaîne séparée par des virgules ; seul `set-cookie` est exposé sous forme de tableau (certains en-têtes comme `host` ou `content-type` gardent seulement la première occurrence). Vérifié sur un vrai serveur Node 22 : deux lignes `X-Forwarded-For: 1.1.1.1` et `X-Forwarded-For: 2.2.2.2` donnent `req.headers['x-forwarded-for'] === "1.1.1.1, 2.2.2.2"`.
+- `request.headers['x-forwarded-for']` et `['x-forwarded-proto']` ne sont donc jamais des tableaux en production : la branche `Array.isArray` n'existe que pour le typage (`IncomingHttpHeaders`) et les mocks de test.
+- Pour `x-forwarded-proto`, garder la première valeur est d'ailleurs le comportement voulu (le protocole vu par le premier proxy).
+
+**À revoir si** : le Gateway reçoit ses en-têtes d'une autre source que `node:http` (par exemple un adaptateur HTTP/2 ou une plateforme serverless qui exposerait des tableaux).

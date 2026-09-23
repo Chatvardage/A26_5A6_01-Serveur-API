@@ -19,7 +19,6 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unsafe-argument': 'warn',
     },
@@ -27,6 +26,8 @@ export default tseslint.config(
   {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
     rules: {
+      // Accès aux membres privés dans les tests (docs/DECISIONS.md, D9).
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',

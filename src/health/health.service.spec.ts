@@ -52,6 +52,37 @@ describe('HealthService', () => {
     ]);
   });
 
+  it('releases each upstream connection by cancelling the response body', async () => {
+    const responses = [200, 503, 200, 500].map(
+      (status) => new Response('body', { status }),
+    );
+    const cancels = responses.map((response) =>
+      jest.spyOn(response.body as ReadableStream, 'cancel'),
+    );
+    const fetchMock = jest.spyOn(global, 'fetch');
+    for (const response of responses) {
+      fetchMock.mockResolvedValueOnce(response);
+    }
+
+    await new HealthService(config).checkUpstreams();
+
+    for (const cancel of cancels) {
+      expect(cancel.mock.calls).toHaveLength(1);
+    }
+  });
+
+  it('handles an upstream response without a body', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(() =>
+        Promise.resolve(new Response(null, { status: 204 })),
+      );
+
+    const report = await new HealthService(config).checkUpstreams();
+
+    expect(report.status).toBe('ok');
+  });
+
   it('reports degraded for non-2xx and network errors', async () => {
     jest
       .spyOn(global, 'fetch')
