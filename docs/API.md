@@ -44,7 +44,7 @@ Toutes ces routes exigent un Bearer JWT, validé par Room-Service auprès d'Auth
 | POST | `/api/servers/:id/channels` | modérateur minimum |
 | PATCH | `/api/channels/:id` | modérateur minimum |
 | DELETE | `/api/channels/:id` | modérateur minimum (un serveur garde au moins un salon) |
-| GET | `/api/admin/servers` | admin |
+| GET | `/api/admin/servers?decalage=&limite=` | admin ; par pages (`{ serveurs, total, suivant }`, 100 au plus) |
 
 Routes de transition, conservées pour le Dashboard et à retirer une fois celui-ci migré :
 
