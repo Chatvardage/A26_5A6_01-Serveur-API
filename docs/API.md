@@ -120,6 +120,7 @@ Le Gateway relaie les événements tels quels ; leur contrat détaillé est dans
 - `room-message.revoked` (socket retiré d'un salon dont l'accès est perdu)
 - `typing`
 - `connexion.prete` (socket authentifié : le client peut annoncer sa présence et rejoindre ses salons)
+- `session.revoquee` (jeton refusé à la connexion ou à la revalidation périodique : le socket est ensuite déconnecté)
 - `presence.snapshot`, `presence.changed`, `profil.changed`
 - `serveur.change` (changement dans un serveur, signalé par Room-Service)
 
