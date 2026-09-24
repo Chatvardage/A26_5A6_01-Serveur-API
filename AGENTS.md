@@ -21,7 +21,7 @@ Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il 
 
 1. Ne pas créer de base de données, de schéma Prisma ou de table dans ce dépôt.
 2. Ne pas valider/décoder localement le JWT : transmettre `Authorization: Bearer <JWT>` tel quel. Auth reste la source de vérité.
-3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client. Les proxies HTTP et WebSocket doivent les supprimer. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me` puis crée `x-user-id` à partir de l’identité Auth validée. Pour Socket.IO, le Gateway n'injecte aucune identité : Message-Service valide `auth.token` auprès d'Auth-Service.
+3. Ne jamais faire confiance à `x-user-id`/`x-user-role` reçus du client, ni relayer un `x-internal-token` (secret entre microservices) reçu du client. Les proxies HTTP et WebSocket doivent les supprimer. Pour User-Config uniquement, le Gateway valide le Bearer auprès de `Auth-Service /api/auth/me` puis crée `x-user-id` à partir de l’identité Auth validée. Pour Socket.IO, le Gateway n'injecte aucune identité : Message-Service valide `auth.token` auprès d'Auth-Service.
 4. Préserver les méthodes, chemins, query strings, corps, codes HTTP et réponses des services internes.
 5. Le Gateway peut produire ses propres erreurs uniquement avant/pendant le transport : `413`, `429`, `502` (contrat amont invalide), `503`, `504`.
 6. Appliquer le rate limit à `POST /api/auth/login` et `POST /api/auth/register` avant Auth-Service. Toute nouvelle route **publique** d'Auth-Service (sans Bearer, ex. réinitialisation de mot de passe) doit être ajoutée à `isRateLimitedAuthRoute` (voir `docs/DECISIONS.md`, D7).
@@ -32,8 +32,8 @@ Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il 
 
 - `/api/auth/*` -> Auth-Service (`3001`)
 - `/api/users/*` -> Auth-Service (`3001`)
-- `/api/rooms/*` -> Room-Service (`3003`)
-- `/api/admin/rooms/*` -> Room-Service (`3003`)
+- `/api/servers/*`, `/api/channels/*`, `/api/admin/servers` -> Room-Service (`3003`)
+- `/api/internal/*` -> **jamais relayé** (échanges entre microservices uniquement)
 - `/api/messages/*` -> Message-Service (`3004`)
 - `/api/config-utilisateur/*` -> User-Config-Service (`3005`), après validation du Bearer auprès d’Auth
 - `/socket.io/*` -> Message-Service (`3004`, HTTP polling + WebSocket upgrade)

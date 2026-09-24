@@ -3,7 +3,11 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import { Duplex } from 'node:stream';
 import { GatewayConfigService } from './gateway-config.service';
-import { firstHeader, HOP_BY_HOP_HEADERS } from './proxy-headers';
+import {
+  firstHeader,
+  HOP_BY_HOP_HEADERS,
+  RESERVED_HEADERS,
+} from './proxy-headers';
 import { isSocketIoPath } from './proxy-routing';
 
 @Injectable()
@@ -151,11 +155,7 @@ export class WebSocketProxyService implements OnModuleDestroy {
           lowerName !== 'connection' &&
           lowerName !== 'upgrade') ||
         lowerName === 'host' ||
-        lowerName === 'x-user-id' ||
-        lowerName === 'x-user-role' ||
-        lowerName === 'x-forwarded-for' ||
-        lowerName === 'x-forwarded-proto' ||
-        lowerName === 'x-forwarded-host'
+        RESERVED_HEADERS.has(lowerName)
       ) {
         continue;
       }

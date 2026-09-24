@@ -11,6 +11,18 @@ export const HOP_BY_HOP_HEADERS = new Set([
   'upgrade',
 ]);
 
+// En-têtes que seul le Gateway pose (identité, métadonnées de transfert) ou
+// réservés aux appels entre microservices (x-internal-token) : ceux envoyés
+// par le client sont retirés, jamais relayés.
+export const RESERVED_HEADERS = new Set([
+  'x-user-id',
+  'x-user-role',
+  'x-internal-token',
+  'x-forwarded-for',
+  'x-forwarded-proto',
+  'x-forwarded-host',
+]);
+
 // Node fusionne déjà les en-têtes répétés en une seule chaîne (sauf
 // set-cookie) : le cas tableau ne sert qu'au typage (docs/DECISIONS.md, D10).
 export function firstHeader(

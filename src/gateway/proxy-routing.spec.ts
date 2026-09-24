@@ -10,10 +10,10 @@ describe('proxy routing', () => {
     ['/api/auth/login', 'auth'],
     ['/api/users', 'auth'],
     ['/api/users/abc', 'auth'],
-    ['/api/rooms', 'room'],
-    ['/api/rooms/abc', 'room'],
-    ['/api/admin/rooms', 'room'],
-    ['/api/admin/rooms/abc', 'room'],
+    ['/api/servers', 'room'],
+    ['/api/servers/abc/channels', 'room'],
+    ['/api/channels/abc', 'room'],
+    ['/api/admin/servers', 'room'],
     ['/api/messages', 'message'],
     ['/api/messages/abc', 'message'],
     ['/socket.io', 'message'],
@@ -36,7 +36,14 @@ describe('proxy routing', () => {
     '/api/authentication',
     '/api/users-extra',
     '/api/room',
-    '/api/admin/rooms-extra',
+    // Anciennes routes de transition, retirées.
+    '/api/rooms',
+    '/api/rooms/abc',
+    '/api/admin/rooms',
+    '/api/admin/rooms/abc',
+    '/api/servers-extra',
+    '/api/channel',
+    '/api/internal/channels/abc/access/u1',
     '/api/messages-extra',
     '/socket.io-extra',
     '/api/config-utilisateurs',
@@ -49,6 +56,11 @@ describe('proxy routing', () => {
     expect(isRateLimitedAuthRoute('post', '/api/auth/register')).toBe(true);
     expect(isRateLimitedAuthRoute('GET', '/api/auth/login')).toBe(false);
     expect(isRateLimitedAuthRoute('POST', '/api/auth/me')).toBe(false);
+    // Vérifient le mot de passe actuel.
+    expect(isRateLimitedAuthRoute('PATCH', '/api/auth/me')).toBe(true);
+    expect(isRateLimitedAuthRoute('delete', '/api/auth/me')).toBe(true);
+    expect(isRateLimitedAuthRoute('GET', '/api/auth/me')).toBe(false);
+    expect(isRateLimitedAuthRoute('PATCH', '/api/users/abc')).toBe(false);
   });
 
   it('recognizes only the Socket.IO path boundary', () => {

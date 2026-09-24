@@ -115,6 +115,7 @@ describe('WebSocketProxyService', () => {
         origin: 'http://localhost:5173',
         'x-user-id': 'forged-user',
         'x-user-role': 'admin',
+        'x-internal-token': 'forged-token',
         'x-forwarded-for': '1.2.3.4',
         'x-forwarded-proto': 'https',
         'x-forwarded-host': 'evil.example',
@@ -149,6 +150,7 @@ describe('WebSocketProxyService', () => {
     const requestOptions = requestSpy.mock.calls[0][0] as http.RequestOptions;
     expect(requestOptions.headers).not.toHaveProperty('x-user-id');
     expect(requestOptions.headers).not.toHaveProperty('x-user-role');
+    expect(requestOptions.headers).not.toHaveProperty('x-internal-token');
     expect(requestOptions.headers).not.toHaveProperty('proxy-authorization');
     expect(requestOptions.headers).not.toHaveProperty('te');
     expect(requestOptions.headers).not.toHaveProperty('keep-alive');

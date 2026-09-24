@@ -12,6 +12,9 @@ export interface GatewayConfig {
   authRateLimitMax: number;
   corsOrigins: string[];
   trustProxy: boolean;
+  authCacheTtlMs: number;
+  /** Secret entre microservices, joint aux requêtes vers User-Config. */
+  internalServiceToken?: string;
 }
 
 function positiveInteger(
@@ -37,6 +40,19 @@ function positiveInteger(
   }
 
   return value;
+}
+
+function nonNegativeInteger(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+): number {
+  const raw = environment[name];
+  if (raw === undefined) {
+    return fallback;
+  }
+  const normalized = raw.trim();
+  return normalized === '0' ? 0 : positiveInteger(environment, name, fallback);
 }
 
 function portNumber(
@@ -167,6 +183,17 @@ export function resolveGatewayConfig(
     authRateLimitMax: positiveInteger(environment, 'AUTH_RATE_LIMIT_MAX', 10),
     corsOrigins,
     trustProxy: booleanValue(environment, 'TRUST_PROXY', false),
+    // Durée de mémorisation d'une identité validée par Auth (routes
+    // User-Config) ; 0 = appel à Auth à chaque requête.
+    authCacheTtlMs: nonNegativeInteger(
+      environment,
+      'AUTH_CACHE_TTL_MS',
+      10_000,
+    ),
+    // User-Config ne croit x-user-id qu'avec ce secret : sans lui, ses
+    // routes répondent 503 (échec fermé côté User-Config).
+    internalServiceToken:
+      environment.INTERNAL_SERVICE_TOKEN?.trim() || undefined,
   };
 }
 
@@ -183,6 +210,8 @@ export class GatewayConfigService implements GatewayConfig {
   readonly authRateLimitMax!: number;
   readonly corsOrigins!: string[];
   readonly trustProxy!: boolean;
+  readonly authCacheTtlMs!: number;
+  readonly internalServiceToken?: string;
 
   constructor() {
     Object.assign(this, resolveGatewayConfig());
