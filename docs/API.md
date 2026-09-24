@@ -30,7 +30,8 @@ Toutes ces routes exigent un Bearer JWT, validé par Room-Service auprès d'Auth
 | GET | `/api/servers/decouvrir?q=<nom>` | serveurs publics dont je ne suis pas membre |
 | GET | `/api/servers/invitations/me` | mes invitations |
 | POST | `/api/servers` | tout utilisateur (devient propriétaire) |
-| GET | `/api/servers/:id` | membre ; aperçu si public et non-membre |
+| GET | `/api/servers/:id` | membre ; aperçu si public et non-membre (sans liste des membres) |
+| GET | `/api/servers/:id/members?decalage=&limite=&ids=` | membre ; membres par pages (`{ membres, total, suivant }`, 100 au plus) |
 | PATCH | `/api/servers/:id` | propriétaire ou admin |
 | DELETE | `/api/servers/:id` | propriétaire ou admin (pas le serveur par défaut) |
 | POST | `/api/servers/:id/join` | serveur public, ou privé sur invitation |
