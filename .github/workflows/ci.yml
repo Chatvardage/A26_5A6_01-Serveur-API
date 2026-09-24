@@ -31,3 +31,5 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:cov
+      # Pipeline HTTP complète (supertest), sans base de données.
+      - run: npm run test:e2e
