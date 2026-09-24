@@ -98,7 +98,7 @@ curl http://localhost:3000/api/config-utilisateur \
   -H "Authorization: Bearer <JWT>"
 ```
 
-Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service. Cet appel de validation reçoit les mêmes métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites que les requêtes proxy normales.
+Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role`/`x-internal-token` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service. Cet appel de validation reçoit les mêmes métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites que les requêtes proxy normales.
 
 ## Exemple Message REST
 
@@ -122,7 +122,7 @@ socket.emit('private-message.send', {
 });
 ```
 
-Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service. Le Gateway supprime aussi les en-têtes entrants `x-user-id` et `x-user-role` du handshake/passage WebSocket afin qu'un client ne puisse pas usurper une identité. Il reconstruit également les métadonnées `x-forwarded-*` à partir de la connexion; la chaîne `x-forwarded-for` et le protocole transmis par un proxy amont ne sont honorés que si `TRUST_PROXY=true`. Aucun `x-user-id` de confiance n'est injecté pour Socket.IO : Message-Service établit lui-même l'identité à partir du token du handshake.
+Le Gateway ne lit pas `auth.token`; il relaie le protocole Socket.IO. Message-Service valide ensuite ce token auprès d'Auth-Service. Le Gateway supprime aussi les en-têtes entrants `x-user-id`, `x-user-role` et `x-internal-token` du handshake/passage WebSocket afin qu'un client ne puisse pas usurper une identité. Il reconstruit également les métadonnées `x-forwarded-*` à partir de la connexion; la chaîne `x-forwarded-for` et le protocole transmis par un proxy amont ne sont honorés que si `TRUST_PROXY=true`. Aucun `x-user-id` de confiance n'est injecté pour Socket.IO : Message-Service établit lui-même l'identité à partir du token du handshake.
 
 ## Rate limit Auth
 

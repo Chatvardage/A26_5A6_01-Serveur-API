@@ -483,6 +483,7 @@ describe('HttpProxyService', () => {
           authorization: 'Bearer jwt-valid',
           'x-user-id': 'spoofed-user',
           'x-user-role': 'admin',
+          'x-internal-token': 'forged-token',
         },
       }),
       res,
@@ -508,6 +509,8 @@ describe('HttpProxyService', () => {
     expect(configHeaders.get('authorization')).toBe('Bearer jwt-valid');
     expect(configHeaders.get('x-user-id')).toBe('user-123');
     expect(configHeaders.get('x-user-role')).toBeNull();
+    expect(authHeaders.get('x-internal-token')).toBeNull();
+    expect(configHeaders.get('x-internal-token')).toBeNull();
     expect(state.statusCode).toBe(200);
   });
 

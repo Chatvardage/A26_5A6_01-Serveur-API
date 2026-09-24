@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { NextFunction, Request, Response } from 'express';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
-import { firstHeader, HOP_BY_HOP_HEADERS } from './proxy-headers';
+import {
+  firstHeader,
+  HOP_BY_HOP_HEADERS,
+  RESERVED_HEADERS,
+} from './proxy-headers';
 import {
   isRateLimitedAuthRoute,
   resolveUpstream,
@@ -296,11 +300,7 @@ export class HttpProxyService {
         HOP_BY_HOP_HEADERS.has(lowerName) ||
         lowerName === 'host' ||
         lowerName === 'content-length' ||
-        lowerName === 'x-user-id' ||
-        lowerName === 'x-user-role' ||
-        lowerName === 'x-forwarded-for' ||
-        lowerName === 'x-forwarded-proto' ||
-        lowerName === 'x-forwarded-host'
+        RESERVED_HEADERS.has(lowerName)
       ) {
         continue;
       }
