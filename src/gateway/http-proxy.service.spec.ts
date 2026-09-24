@@ -451,6 +451,42 @@ describe('HttpProxyService', () => {
     },
   );
 
+  it("joins the internal token to User-Config requests only, never to Auth's", async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: 'user-123' }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const service = new HttpProxyService(
+      config({ internalServiceToken: 'secret-interne' }),
+      { consume: jest.fn() } as unknown as AuthRateLimitService,
+    );
+
+    await service.handle(
+      request({
+        url: '/api/config-utilisateur',
+        headers: { authorization: 'Bearer jwt-valid' },
+      }),
+      response().response,
+      jest.fn(),
+    );
+    await service.handle(
+      request({ url: '/api/servers' }),
+      response().response,
+      jest.fn(),
+    );
+
+    const enTete = (appel: number) =>
+      (fetchSpy.mock.calls[appel][1]?.headers as Headers).get(
+        'x-internal-token',
+      );
+    expect(enTete(0)).toBeNull(); // Auth /api/auth/me
+    expect(enTete(1)).toBe('secret-interne'); // User-Config
+    expect(enTete(2)).toBeNull(); // Room-Service
+  });
+
   it('authenticates User-Config through Auth and replaces client identity headers', async () => {
     const fetchSpy = jest
       .spyOn(global, 'fetch')

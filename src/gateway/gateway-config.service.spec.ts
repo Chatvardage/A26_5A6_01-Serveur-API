@@ -52,6 +52,7 @@ describe('resolveGatewayConfig', () => {
       corsOrigins: ['http://localhost:5173'],
       trustProxy: false,
       authCacheTtlMs: 10_000,
+      internalServiceToken: undefined,
     });
   });
 
@@ -70,6 +71,7 @@ describe('resolveGatewayConfig', () => {
         CORS_ORIGINS: 'https://app.example.com, null,https://admin.example.com',
         TRUST_PROXY: 'true',
         AUTH_CACHE_TTL_MS: '2500',
+        INTERNAL_SERVICE_TOKEN: ' secret-interne ',
       }),
     ).toEqual({
       port: 3100,
@@ -88,6 +90,7 @@ describe('resolveGatewayConfig', () => {
       ],
       trustProxy: true,
       authCacheTtlMs: 2500,
+      internalServiceToken: 'secret-interne',
     });
   });
 

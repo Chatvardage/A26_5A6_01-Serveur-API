@@ -315,6 +315,10 @@ export class HttpProxyService {
 
     if (authenticatedUserId) {
       headers.set('x-user-id', authenticatedUserId);
+      // Prouve à User-Config que x-user-id vient du Gateway.
+      if (this.config.internalServiceToken) {
+        headers.set('x-internal-token', this.config.internalServiceToken);
+      }
     }
 
     return headers;

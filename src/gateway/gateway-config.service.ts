@@ -13,6 +13,8 @@ export interface GatewayConfig {
   corsOrigins: string[];
   trustProxy: boolean;
   authCacheTtlMs: number;
+  /** Secret entre microservices, joint aux requêtes vers User-Config. */
+  internalServiceToken?: string;
 }
 
 function positiveInteger(
@@ -188,6 +190,10 @@ export function resolveGatewayConfig(
       'AUTH_CACHE_TTL_MS',
       10_000,
     ),
+    // User-Config ne croit x-user-id qu'avec ce secret : sans lui, ses
+    // routes répondent 503 (échec fermé côté User-Config).
+    internalServiceToken:
+      environment.INTERNAL_SERVICE_TOKEN?.trim() || undefined,
   };
 }
 
@@ -205,6 +211,7 @@ export class GatewayConfigService implements GatewayConfig {
   readonly corsOrigins!: string[];
   readonly trustProxy!: boolean;
   readonly authCacheTtlMs!: number;
+  readonly internalServiceToken?: string;
 
   constructor() {
     Object.assign(this, resolveGatewayConfig());

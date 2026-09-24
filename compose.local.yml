@@ -15,6 +15,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       AUTH_CACHE_TTL_MS: ${AUTH_CACHE_TTL_MS:-10000}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-chatvardage_internal_dev}
     ports:
       - "3000:3000"
     extra_hosts:

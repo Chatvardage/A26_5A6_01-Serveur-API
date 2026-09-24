@@ -98,7 +98,7 @@ curl http://localhost:3000/api/config-utilisateur \
   -H "Authorization: Bearer <JWT>"
 ```
 
-Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role`/`x-internal-token` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service. Cet appel de validation reçoit les mêmes métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites que les requêtes proxy normales.
+Le Gateway appelle d’abord `Auth-Service /api/auth/me`. Si le jeton est valide, il récupère l’`id` retourné, supprime tout `x-user-id`/`x-user-role`/`x-internal-token` fourni par le client, puis transmet un `x-user-id` fiable à User-Config-Service, accompagné de `x-internal-token` (`INTERNAL_SERVICE_TOKEN`) : User-Config ne croit `x-user-id` qu'avec ce secret. Cet appel de validation reçoit les mêmes métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites que les requêtes proxy normales.
 
 ## Exemple Message REST
 
@@ -229,6 +229,7 @@ Le Compose global d’Infra contient maintenant cette intégration.
 | `AUTH_RATE_LIMIT_MAX` | `10` | requêtes max par IP/route/fenêtre |
 | `CORS_ORIGINS` | `http://localhost:5173` | liste blanche CORS |
 | `TRUST_PROXY` | `false` | accepte les `X-Forwarded-*` entrants seulement derrière un proxy de confiance |
+| `INTERNAL_SERVICE_TOKEN` | aucun | secret partagé entre microservices, joint (`x-internal-token`) aux seules requêtes vers User-Config ; sans lui, User-Config répond 503 |
 | `AUTH_CACHE_TTL_MS` | `10000` | durée (ms) de mémorisation d'une identité validée par Auth pour les routes User-Config ; une révocation est prise en compte au plus tard après ce délai ; `0` = appel à Auth à chaque requête |
 
 ## Vérifications avant PR

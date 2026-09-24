@@ -82,7 +82,7 @@ Messages de salon (droits de lecture/écriture vérifiés auprès de Room-Servic
 | PUT | `/api/config-utilisateur/presence` | Bearer JWT validé auprès d’Auth |
 | GET | `/api/config-utilisateur/publiques?ids=<id>,<id>&inclureAvatar=false` | Bearer JWT validé auprès d’Auth ; alias, avatar et présence d'autres utilisateurs, 100 ids max |
 
-Le client n’envoie jamais une identité de confiance. Le Gateway supprime les en-têtes entrants `x-user-id`, `x-user-role` et `x-internal-token`, appelle `GET /api/auth/me` avec le Bearer reçu, puis transmet à User-Config un `x-user-id` dérivé de l’utilisateur Auth validé. Une erreur Auth est relayée avec son code d’origine.
+Le client n’envoie jamais une identité de confiance. Le Gateway supprime les en-têtes entrants `x-user-id`, `x-user-role` et `x-internal-token`, appelle `GET /api/auth/me` avec le Bearer reçu, puis transmet à User-Config un `x-user-id` dérivé de l’utilisateur Auth validé, avec `x-internal-token` (`INTERNAL_SERVICE_TOKEN`), sans lequel User-Config refuse `x-user-id`. Une erreur Auth est relayée avec son code d’origine.
 
 La validation préalable des routes User-Config transmet à Auth-Service les métadonnées `x-forwarded-for`, `x-forwarded-proto` et `x-forwarded-host` reconstruites par le Gateway. Les valeurs entrantes ne sont honorées que lorsque `TRUST_PROXY=true`. Une identité validée est mémorisée `AUTH_CACHE_TTL_MS` (10 s par défaut) ; un refus d'Auth n'est jamais mémorisé et est renvoyé tel quel.
 
