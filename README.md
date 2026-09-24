@@ -39,11 +39,16 @@ Frontend Electron / Dashboard
 |---|---|
 | `/api/auth/*` | Auth-Service |
 | `/api/users/*` | Auth-Service |
-| `/api/rooms/*` | Room-Service |
-| `/api/admin/rooms/*` | Room-Service |
+| `/api/servers/*` | Room-Service (serveurs, membres, invitations, création de salons) |
+| `/api/channels/*` | Room-Service (modification / suppression de salons) |
+| `/api/admin/servers` | Room-Service |
+| `/api/rooms/*` | Room-Service (transition, Dashboard : `DELETE /api/rooms/:id` ; à retirer) |
+| `/api/admin/rooms/*` | Room-Service (transition, Dashboard) |
 | `/api/messages/*` | Message-Service |
 | `/socket.io/*` | Message-Service |
 | `/api/config-utilisateur/*` | User-Config-Service (après validation Auth) |
+
+`/api/internal/*` n'est **jamais** relayé : ces routes servent aux échanges entre microservices (protégées par `INTERNAL_SERVICE_TOKEN`). Détail de toutes les routes : `docs/API.md`.
 
 Le chemin et la query string restent inchangés.
 
@@ -82,7 +87,7 @@ La réponse vient directement d'Auth-Service.
 ## Exemple Room via Gateway
 
 ```bash
-curl http://localhost:3000/api/rooms \
+curl http://localhost:3000/api/servers \
   -H "Authorization: Bearer <JWT>"
 ```
 

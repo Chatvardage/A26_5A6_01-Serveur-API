@@ -12,7 +12,14 @@ export function resolveUpstream(pathname: string): UpstreamService | null {
     return 'auth';
   }
 
+  // Serveurs et salons (façon Discord). `/api/rooms` et `/api/admin/rooms`
+  // restent relayés pendant la transition (Dashboard : DELETE
+  // /api/rooms/:id et GET /api/admin/rooms). `/api/internal/*` n'est volontairement PAS relayé : route
+  // entre microservices, protégée par INTERNAL_SERVICE_TOKEN.
   if (
+    matchesPrefix(pathname, '/api/servers') ||
+    matchesPrefix(pathname, '/api/channels') ||
+    matchesPrefix(pathname, '/api/admin/servers') ||
     matchesPrefix(pathname, '/api/rooms') ||
     matchesPrefix(pathname, '/api/admin/rooms')
   ) {

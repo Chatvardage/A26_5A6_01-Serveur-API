@@ -11,6 +11,8 @@ Le Serveur-API conserve les contrats des microservices. Il ne renomme pas les ch
 | GET | `/api/auth/me` | Bearer JWT |
 | PATCH | `/api/auth/me` | Bearer JWT |
 | DELETE | `/api/auth/me` | Bearer JWT |
+| GET | `/api/users/lookup?ids=<id>,<id>` | Bearer JWT (tout utilisateur) ; `{id, pseudo}` seulement, 100 ids max |
+| GET | `/api/users/search?q=<début de pseudo>&limit=<1-50>` | Bearer JWT (tout utilisateur) ; `{id, pseudo}` seulement |
 | GET | `/api/users` | admin |
 | POST | `/api/users` | admin |
 | GET | `/api/users/:id` | admin |
@@ -18,36 +20,64 @@ Le Serveur-API conserve les contrats des microservices. Il ne renomme pas les ch
 | DELETE | `/api/users/:id` | admin |
 | PATCH | `/api/users/:id/role` | admin |
 
-## Salons -> Room-Service
+## Serveurs et salons -> Room-Service
 
-| Méthode | Route Gateway |
-|---|---|
-| GET | `/api/rooms` |
-| GET | `/api/rooms/:id` |
-| POST | `/api/rooms` |
-| PATCH | `/api/rooms/:id` |
-| DELETE | `/api/rooms/:id` |
-| GET | `/api/rooms/invitations/me` |
-| POST | `/api/rooms/:id/invitations` |
-| POST | `/api/rooms/:id/invitations/accept` |
-| POST | `/api/rooms/:id/invitations/refuse` |
-| POST | `/api/rooms/:id/join` |
-| POST | `/api/rooms/:id/leave` |
-| GET | `/api/admin/rooms` |
+Toutes ces routes exigent un Bearer JWT, validé par Room-Service auprès d'Auth-Service. Les droits (membre, modérateur, propriétaire du serveur, admin global) sont vérifiés par Room-Service ; un serveur privé inaccessible répond `404`, comme un serveur inexistant.
 
-Les routes publiques/optionnelles/protégées restent déterminées par Room-Service. Le Gateway ne remplace pas sa validation auprès d'Auth-Service.
+| Méthode | Route Gateway | Droits |
+|---|---|---|
+| GET | `/api/servers` | mes serveurs (ajoute l'appelant au serveur par défaut) |
+| GET | `/api/servers/decouvrir?q=<nom>` | serveurs publics dont je ne suis pas membre |
+| GET | `/api/servers/invitations/me` | mes invitations |
+| POST | `/api/servers` | tout utilisateur (devient propriétaire) |
+| GET | `/api/servers/:id` | membre ; aperçu si public et non-membre |
+| PATCH | `/api/servers/:id` | propriétaire ou admin |
+| DELETE | `/api/servers/:id` | propriétaire ou admin (pas le serveur par défaut) |
+| POST | `/api/servers/:id/join` | serveur public, ou privé sur invitation |
+| POST | `/api/servers/:id/leave` | membre (ni le propriétaire, ni le serveur par défaut) |
+| DELETE | `/api/servers/:id/members/:userId` | modérateur minimum, au-dessus de la cible |
+| PATCH | `/api/servers/:id/members/:userId` | propriétaire ou admin (nommer/retirer un modérateur) |
+| POST | `/api/servers/:id/invitations` | modérateur minimum (pas le serveur par défaut) |
+| POST | `/api/servers/:id/invitations/accept` | invité |
+| POST | `/api/servers/:id/invitations/refuse` | invité |
+| POST | `/api/servers/:id/channels` | modérateur minimum |
+| PATCH | `/api/channels/:id` | modérateur minimum |
+| DELETE | `/api/channels/:id` | modérateur minimum (un serveur garde au moins un salon) |
+| GET | `/api/admin/servers` | admin |
 
-## Messages privés -> Message-Service
+Routes de transition, conservées pour le Dashboard et à retirer une fois celui-ci migré :
+
+| Méthode | Route Gateway | Droits |
+|---|---|---|
+| GET | `/api/admin/rooms` | admin |
+| DELETE | `/api/rooms/:id` | admin |
+
+L'ancien `GET /api/rooms/:id` (authentification optionnelle) a été retiré de Room-Service : il exposait le nom et les membres de serveurs privés. Les routes `/api/internal/*` (entre microservices, jeton `INTERNAL_SERVICE_TOKEN`) ne sont **jamais** relayées par le Gateway.
+
+## Messages -> Message-Service
+
+Toutes les routes exigent un Bearer JWT, validé par Message-Service auprès d'Auth-Service.
+
+Messages privés :
 
 | Méthode | Route Gateway |
 |---|---|
 | POST | `/api/messages` |
+| GET | `/api/messages/conversations` |
 | GET | `/api/messages/history/:otherUserId?limit=50&cursor=<messageId>` |
 | GET | `/api/messages/:id` |
 | PATCH | `/api/messages/:id` |
 | DELETE | `/api/messages/:id` |
 
-Toutes les routes de messages privés requièrent le JWT selon le contrat de Message-Service.
+Messages de salon (droits de lecture/écriture vérifiés auprès de Room-Service à chaque appel) :
+
+| Méthode | Route Gateway |
+|---|---|
+| POST | `/api/messages/rooms/:roomId` |
+| GET | `/api/messages/rooms/:roomId/history?limit=50&cursor=<messageId>` |
+| GET | `/api/messages/rooms/:roomId/:id` |
+| PATCH | `/api/messages/rooms/:roomId/:id` |
+| DELETE | `/api/messages/rooms/:roomId/:id` |
 
 ## Configuration utilisateur -> User-Config-Service
 
@@ -56,6 +86,7 @@ Toutes les routes de messages privés requièrent le JWT selon le contrat de Mes
 | GET | `/api/config-utilisateur` | Bearer JWT validé auprès d’Auth |
 | PATCH | `/api/config-utilisateur` | Bearer JWT validé auprès d’Auth |
 | PUT | `/api/config-utilisateur/presence` | Bearer JWT validé auprès d’Auth |
+| GET | `/api/config-utilisateur/publiques?ids=<id>,<id>&inclureAvatar=false` | Bearer JWT validé auprès d’Auth ; alias, avatar et présence d'autres utilisateurs, 100 ids max |
 
 Le client n’envoie jamais une identité de confiance. Le Gateway supprime les en-têtes entrants `x-user-id` et `x-user-role`, appelle `GET /api/auth/me` avec le Bearer reçu, puis transmet à User-Config un `x-user-id` dérivé de l’utilisateur Auth validé. Une erreur Auth est relayée avec son code d’origine.
 
@@ -73,13 +104,24 @@ const socket = io('http://localhost:3000/messages', {
 
 Le handshake HTTP/polling et l'upgrade WebSocket utilisent le chemin Socket.IO `/socket.io`. Le Gateway le relaie vers Message-Service (`3004`) en supprimant les en-têtes entrants `x-user-id` et `x-user-role`. Le Gateway reconstruit les métadonnées `x-forwarded-*`; la chaîne `x-forwarded-for` et le protocole fournis par un proxy amont ne sont honorés que lorsque `TRUST_PROXY=true`. Aucun identifiant de confiance n'est injecté par le Gateway pour Socket.IO : le namespace reste `/messages` et Message-Service établit l'identité à partir de `auth.token`, validé auprès d'Auth-Service.
 
-Émission client : `private-message.send`.
+Le Gateway relaie les événements tels quels ; leur contrat détaillé est dans Message-Service (`README.md`, `docs/TEMPS_REEL_DM.md`, `docs/TEMPS_REEL_SALONS.md`).
+
+Émissions client :
+
+- `private-message.send`
+- `room-message.join`, `room-message.leave`, `room-message.send`
+- `typing` (éphémère, salon ou DM)
+- `presence.update`, `profil.update`
 
 Événements serveur :
 
-- `private-message.created`
-- `private-message.updated`
-- `private-message.deleted`
+- `private-message.created`, `private-message.updated`, `private-message.deleted`
+- `room-message.created`, `room-message.updated`, `room-message.deleted`
+- `room-message.revoked` (socket retiré d'un salon dont l'accès est perdu)
+- `typing`
+- `connexion.prete` (socket authentifié : le client peut annoncer sa présence et rejoindre ses salons)
+- `presence.snapshot`, `presence.changed`, `profil.changed`
+- `serveur.change` (changement dans un serveur, signalé par Room-Service)
 
 ## CORS et en-têtes de cache
 
