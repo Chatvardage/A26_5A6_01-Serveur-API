@@ -11,7 +11,7 @@ Le Serveur-API :
 - transmet `Authorization: Bearer <JWT>` tel quel aux services;
 - pour User-Config, valide le Bearer auprès d’Auth puis injecte un `x-user-id` fiable;
 - applique CORS au point d'entrée;
-- limite `POST /api/auth/login` et `/api/auth/register` avant Argon2;
+- limite `POST /api/auth/login`, `/api/auth/register` et `PATCH`/`DELETE /api/auth/me` avant Argon2;
 - transforme les pannes de transport en `503/504` et signale en `502` un contrat Auth invalide lors de l'accès à User-Config;
 - relaie Socket.IO (`/socket.io`) vers Message-Service;
 - fournit son liveness et un diagnostic des services internes.
@@ -137,6 +137,7 @@ La limite est appliquée **par IP et par route** à :
 
 - `POST /api/auth/login`
 - `POST /api/auth/register`
+- `PATCH /api/auth/me` et `DELETE /api/auth/me` (même compteur) : elles vérifient le mot de passe actuel, qu'un jeton volé ne doit pas permettre de deviner par essais successifs
 
 Une requête refusée reçoit `429` et `Retry-After`. Le store est en mémoire et les buckets expirés sont purgés périodiquement pour éviter une croissance permanente avec des IP one-shot. Cette approche reste adaptée au Compose C2 à une instance. Si plusieurs instances du Gateway sont déployées plus tard, ce compteur devra être partagé (par exemple Redis).
 

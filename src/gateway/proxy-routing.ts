@@ -38,13 +38,22 @@ export function resolveUpstream(pathname: string): UpstreamService | null {
   return null;
 }
 
+/**
+ * Routes où Auth vérifie un mot de passe (Argon2, volontairement lent) :
+ * connexion, inscription, et modification ou suppression de son compte, qui
+ * exigent le mot de passe actuel — sans limite, un jeton volé permettait de
+ * le deviner par essais successifs.
+ */
 export function isRateLimitedAuthRoute(
   method: string,
   pathname: string,
 ): boolean {
+  const verbe = method.toUpperCase();
+  if (verbe === 'POST') {
+    return pathname === '/api/auth/login' || pathname === '/api/auth/register';
+  }
   return (
-    method.toUpperCase() === 'POST' &&
-    (pathname === '/api/auth/login' || pathname === '/api/auth/register')
+    (verbe === 'PATCH' || verbe === 'DELETE') && pathname === '/api/auth/me'
   );
 }
 

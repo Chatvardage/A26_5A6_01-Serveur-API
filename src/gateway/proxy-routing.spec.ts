@@ -56,6 +56,11 @@ describe('proxy routing', () => {
     expect(isRateLimitedAuthRoute('post', '/api/auth/register')).toBe(true);
     expect(isRateLimitedAuthRoute('GET', '/api/auth/login')).toBe(false);
     expect(isRateLimitedAuthRoute('POST', '/api/auth/me')).toBe(false);
+    // Vérifient le mot de passe actuel.
+    expect(isRateLimitedAuthRoute('PATCH', '/api/auth/me')).toBe(true);
+    expect(isRateLimitedAuthRoute('delete', '/api/auth/me')).toBe(true);
+    expect(isRateLimitedAuthRoute('GET', '/api/auth/me')).toBe(false);
+    expect(isRateLimitedAuthRoute('PATCH', '/api/users/abc')).toBe(false);
   });
 
   it('recognizes only the Socket.IO path boundary', () => {
