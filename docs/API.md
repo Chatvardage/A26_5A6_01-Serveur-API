@@ -115,7 +115,7 @@ Le Gateway relaie les événements tels quels ; leur contrat détaillé est dans
 - `typing`
 - `connexion.prete` (socket authentifié : le client peut annoncer sa présence et rejoindre ses salons)
 - `session.revoquee` (jeton refusé à la connexion ou à la revalidation périodique : le socket est ensuite déconnecté)
-- `presence.snapshot`, `presence.changed`, `profil.changed`
+- `presence.changed` (seulement pour les utilisateurs suivis, voir `presence.suivre` : `{ ids }` → `{ enLigne }`), `profil.changed`
 - `serveur.change` (changement dans un serveur, signalé par Room-Service)
 
 ## CORS et en-têtes de cache
