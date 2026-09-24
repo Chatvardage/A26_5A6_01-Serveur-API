@@ -231,6 +231,7 @@ Le Compose global d’Infra contient maintenant cette intégration.
 | `AUTH_RATE_LIMIT_MAX` | `10` | requêtes max par IP/route/fenêtre |
 | `CORS_ORIGINS` | `http://localhost:5173` | liste blanche CORS |
 | `TRUST_PROXY` | `false` | accepte les `X-Forwarded-*` entrants seulement derrière un proxy de confiance |
+| `AUTH_CACHE_TTL_MS` | `10000` | durée (ms) de mémorisation d'une identité validée par Auth pour les routes User-Config ; une révocation est prise en compte au plus tard après ce délai ; `0` = appel à Auth à chaque requête |
 
 ## Vérifications avant PR
 

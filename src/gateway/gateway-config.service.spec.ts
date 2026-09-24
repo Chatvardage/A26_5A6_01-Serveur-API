@@ -17,6 +17,7 @@ describe('resolveGatewayConfig', () => {
       'AUTH_RATE_LIMIT_MAX',
       'CORS_ORIGINS',
       'TRUST_PROXY',
+      'AUTH_CACHE_TTL_MS',
     ];
     const saved = Object.fromEntries(
       names.map((name) => [name, process.env[name]]),
@@ -50,6 +51,7 @@ describe('resolveGatewayConfig', () => {
       authRateLimitMax: 10,
       corsOrigins: ['http://localhost:5173'],
       trustProxy: false,
+      authCacheTtlMs: 10_000,
     });
   });
 
@@ -67,6 +69,7 @@ describe('resolveGatewayConfig', () => {
         AUTH_RATE_LIMIT_MAX: '4',
         CORS_ORIGINS: 'https://app.example.com, null,https://admin.example.com',
         TRUST_PROXY: 'true',
+        AUTH_CACHE_TTL_MS: '2500',
       }),
     ).toEqual({
       port: 3100,
@@ -84,7 +87,17 @@ describe('resolveGatewayConfig', () => {
         'https://admin.example.com',
       ],
       trustProxy: true,
+      authCacheTtlMs: 2500,
     });
+  });
+
+  it('accepte AUTH_CACHE_TTL_MS=0 (cache désactivé), refuse une valeur invalide', () => {
+    expect(
+      resolveGatewayConfig({ AUTH_CACHE_TTL_MS: ' 0 ' }).authCacheTtlMs,
+    ).toBe(0);
+    expect(() => resolveGatewayConfig({ AUTH_CACHE_TTL_MS: '-1' })).toThrow(
+      'AUTH_CACHE_TTL_MS doit être un entier positif',
+    );
   });
 
   it.each([

@@ -5,7 +5,10 @@ import {
   RateLimitResult,
 } from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
-import { HttpProxyService } from './http-proxy.service';
+import {
+  HttpProxyService,
+  TAILLE_MAX_CACHE_IDENTITES,
+} from './http-proxy.service';
 
 function requestTargetToString(input: RequestInfo | URL): string {
   if (typeof input === 'string') {
@@ -41,6 +44,8 @@ function config(
     authRateLimitMax: 10,
     corsOrigins: ['http://localhost:5173'],
     trustProxy: false,
+    // Sans cache par défaut : chaque test voit tous ses appels à Auth.
+    authCacheTtlMs: 0,
     ...overrides,
   };
 }
@@ -504,6 +509,118 @@ describe('HttpProxyService', () => {
     expect(configHeaders.get('x-user-id')).toBe('user-123');
     expect(configHeaders.get('x-user-role')).toBeNull();
     expect(state.statusCode).toBe(200);
+  });
+
+  describe('cache des identités (User-Config)', () => {
+    const identite = () =>
+      new Response(JSON.stringify({ id: 'user-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    const reponseConfig = () => new Response('{}', { status: 200 });
+    const appeler = async (
+      service: HttpProxyService,
+      authorization = 'Bearer jwt-valid',
+    ) => {
+      const { response: res, state } = response();
+      await service.handle(
+        request({ url: '/api/config-utilisateur', headers: { authorization } }),
+        res,
+        jest.fn(),
+      );
+      return state;
+    };
+    const appelsAuth = (fetchSpy: jest.SpyInstance) =>
+      fetchSpy.mock.calls.filter(
+        ([cible]) =>
+          requestTargetToString(cible) === 'http://auth:3001/api/auth/me',
+      ).length;
+    const service = (authCacheTtlMs: number) =>
+      new HttpProxyService(config({ authCacheTtlMs }), {
+        consume: jest.fn(),
+      } as unknown as AuthRateLimitService);
+
+    it('ne rappelle pas Auth pour le même jeton pendant la durée du cache', async () => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockImplementation((cible) =>
+          Promise.resolve(
+            requestTargetToString(cible).startsWith('http://auth')
+              ? identite()
+              : reponseConfig(),
+          ),
+        );
+      const proxy = service(10_000);
+      const maintenant = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+
+      expect((await appeler(proxy)).statusCode).toBe(200);
+      expect((await appeler(proxy)).statusCode).toBe(200);
+      expect(appelsAuth(fetchSpy)).toBe(1);
+      const dernier = fetchSpy.mock.calls.at(-1)?.[1]?.headers as Headers;
+      expect(dernier.get('x-user-id')).toBe('user-123');
+
+      // Autre jeton : autre entrée.
+      await appeler(proxy, 'Bearer autre');
+      expect(appelsAuth(fetchSpy)).toBe(2);
+
+      // Entrée expirée : Auth est interrogé de nouveau.
+      maintenant.mockReturnValue(1_000 + 10_000);
+      await appeler(proxy);
+      expect(appelsAuth(fetchSpy)).toBe(3);
+    });
+
+    it('ne mémorise ni un refus, ni rien sans en-tête ou avec une durée nulle', async () => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+        .mockImplementation((cible) =>
+          Promise.resolve(
+            requestTargetToString(cible).startsWith('http://auth')
+              ? identite()
+              : reponseConfig(),
+          ),
+        );
+      const proxy = service(10_000);
+      expect((await appeler(proxy)).statusCode).toBe(401);
+      expect((await appeler(proxy)).statusCode).toBe(200);
+      expect(appelsAuth(fetchSpy)).toBe(2);
+
+      const { response: res } = response();
+      await proxy.handle(
+        request({ url: '/api/config-utilisateur' }),
+        res,
+        jest.fn(),
+      );
+      await proxy.handle(
+        request({ url: '/api/config-utilisateur' }),
+        response().response,
+        jest.fn(),
+      );
+      expect(appelsAuth(fetchSpy)).toBe(4);
+
+      const sansCache = service(0);
+      await appeler(sansCache);
+      await appeler(sansCache);
+      expect(appelsAuth(fetchSpy)).toBe(6);
+    });
+
+    it("oublie l'identité la plus ancienne quand le cache est plein", async () => {
+      const fetchSpy = jest
+        .spyOn(global, 'fetch')
+        .mockImplementation((cible) =>
+          Promise.resolve(
+            requestTargetToString(cible).startsWith('http://auth')
+              ? identite()
+              : reponseConfig(),
+          ),
+        );
+      const proxy = service(10_000);
+      for (let i = 0; i <= TAILLE_MAX_CACHE_IDENTITES; i += 1) {
+        await appeler(proxy, `Bearer j${i}`);
+      }
+      await appeler(proxy, 'Bearer j0');
+      expect(appelsAuth(fetchSpy)).toBe(TAILLE_MAX_CACHE_IDENTITES + 2);
+    });
   });
 
   it('preserves trusted forwarding metadata during User-Config authentication', async () => {

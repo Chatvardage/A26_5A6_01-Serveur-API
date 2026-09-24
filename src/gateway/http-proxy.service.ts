@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { NextFunction, Request, Response } from 'express';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
@@ -22,10 +23,22 @@ class PayloadTooLargeError extends Error {}
 class InvalidAuthContractError extends Error {}
 class RequestBodyTimeoutError extends Error {}
 
+// Borne la mémoire du cache des identités (entrée la plus ancienne oubliée).
+export const TAILLE_MAX_CACHE_IDENTITES = 10_000;
+
 @Injectable()
 export class HttpProxyService {
   private readonly logger = new Logger(HttpProxyService.name);
   private readonly allowedOrigins: Set<string>;
+  // Identités validées par Auth pour les routes User-Config (clé : empreinte
+  // SHA-256 de l'en-tête Authorization, jamais le jeton lui-même). Même
+  // compromis que Room-Service et Message-Service : une révocation est prise
+  // en compte au plus tard après AUTH_CACHE_TTL_MS. Les refus ne sont
+  // jamais mémorisés.
+  private readonly identites = new Map<
+    string,
+    { userId: string; expireA: number }
+  >();
 
   constructor(
     private readonly config: GatewayConfigService,
@@ -206,6 +219,13 @@ export class HttpProxyService {
     response: Response,
   ): Promise<string | null> {
     const authorization = firstHeader(request.headers.authorization);
+    const clef = authorization
+      ? createHash('sha256').update(authorization).digest('hex')
+      : null;
+    const memorisee = clef ? this.identites.get(clef) : undefined;
+    if (memorisee && memorisee.expireA > Date.now()) {
+      return memorisee.userId;
+    }
     const headers = new Headers();
     if (authorization) {
       headers.set('Authorization', authorization);
@@ -250,6 +270,16 @@ export class HttpProxyService {
       throw new InvalidAuthContractError('champ id absent ou invalide');
     }
 
+    if (clef && this.config.authCacheTtlMs > 0) {
+      this.identites.delete(clef);
+      if (this.identites.size >= TAILLE_MAX_CACHE_IDENTITES) {
+        this.identites.delete(this.identites.keys().next().value as string);
+      }
+      this.identites.set(clef, {
+        userId: payload.id,
+        expireA: Date.now() + this.config.authCacheTtlMs,
+      });
+    }
     return payload.id;
   }
 
