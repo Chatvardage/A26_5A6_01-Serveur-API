@@ -281,7 +281,7 @@ describe('Serveur-API (e2e)', () => {
   });
 
   it('preserves an upstream functional error', async () => {
-    const response = await fetch(`${gatewayUrl}/api/rooms/secret`);
+    const response = await fetch(`${gatewayUrl}/api/servers/secret`);
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ message: 'forbidden-by-room' });
   });

@@ -421,8 +421,8 @@ describe('HttpProxyService', () => {
 
   it.each([
     ['/api/users/1', 'http://auth:3001/api/users/1'],
-    ['/api/rooms/1', 'http://room:3003/api/rooms/1'],
-    ['/api/admin/rooms', 'http://room:3003/api/admin/rooms'],
+    ['/api/servers/1', 'http://room:3003/api/servers/1'],
+    ['/api/admin/servers', 'http://room:3003/api/admin/servers'],
     ['/api/messages/1', 'http://message:3004/api/messages/1'],
     [
       '/socket.io/?EIO=4&transport=polling',
@@ -913,7 +913,7 @@ describe('HttpProxyService', () => {
       } as unknown as AuthRateLimitService);
       const { response: res, state } = response();
 
-      await service.handle(request({ url: '/api/rooms' }), res, jest.fn());
+      await service.handle(request({ url: '/api/servers' }), res, jest.fn());
 
       expect(state.statusCode).toBe(expectedStatus);
       expect((state.jsonBody as { error: string }).error).toBe(expectedError);
@@ -927,7 +927,7 @@ describe('HttpProxyService', () => {
     } as unknown as AuthRateLimitService);
     const { response: res, state } = response();
 
-    await service.handle(request({ url: '/api/rooms' }), res, jest.fn());
+    await service.handle(request({ url: '/api/servers' }), res, jest.fn());
 
     expect(state.statusCode).toBe(503);
   });
@@ -939,7 +939,7 @@ describe('HttpProxyService', () => {
     } as unknown as AuthRateLimitService);
     const { response: res, state } = response(true);
 
-    await service.handle(request({ url: '/api/rooms' }), res, jest.fn());
+    await service.handle(request({ url: '/api/servers' }), res, jest.fn());
 
     expect(state.ended).toBe(true);
     expect(state.jsonBody).toBeUndefined();

@@ -46,14 +46,7 @@ Toutes ces routes exigent un Bearer JWT, validé par Room-Service auprès d'Auth
 | DELETE | `/api/channels/:id` | modérateur minimum (un serveur garde au moins un salon) |
 | GET | `/api/admin/servers?decalage=&limite=` | admin ; par pages (`{ serveurs, total, suivant }`, 100 au plus) |
 
-Routes de transition, conservées pour le Dashboard et à retirer une fois celui-ci migré :
-
-| Méthode | Route Gateway | Droits |
-|---|---|---|
-| GET | `/api/admin/rooms` | admin |
-| DELETE | `/api/rooms/:id` | admin |
-
-L'ancien `GET /api/rooms/:id` (authentification optionnelle) a été retiré de Room-Service : il exposait le nom et les membres de serveurs privés. Les routes `/api/internal/*` (entre microservices, jeton `INTERNAL_SERVICE_TOKEN`) ne sont **jamais** relayées par le Gateway.
+Les anciennes routes `/api/rooms/*` et `/api/admin/rooms` ont été retirées (et ne sont plus relayées) : le Dashboard utilise `GET /api/admin/servers` et les routes ci-dessus. Les routes `/api/internal/*` (entre microservices, jeton `INTERNAL_SERVICE_TOKEN`) ne sont **jamais** relayées par le Gateway.
 
 ## Messages -> Message-Service
 

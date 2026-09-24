@@ -42,8 +42,6 @@ Frontend Electron / Dashboard
 | `/api/servers/*` | Room-Service (serveurs, membres, invitations, création de salons) |
 | `/api/channels/*` | Room-Service (modification / suppression de salons) |
 | `/api/admin/servers` | Room-Service |
-| `/api/rooms/*` | Room-Service (transition, Dashboard : `DELETE /api/rooms/:id` ; à retirer) |
-| `/api/admin/rooms/*` | Room-Service (transition, Dashboard) |
 | `/api/messages/*` | Message-Service |
 | `/socket.io/*` | Message-Service |
 | `/api/config-utilisateur/*` | User-Config-Service (après validation Auth) |

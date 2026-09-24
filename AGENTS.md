@@ -33,7 +33,6 @@ Il constitue le point d'entrée unique du Frontend Electron et du Dashboard. Il 
 - `/api/auth/*` -> Auth-Service (`3001`)
 - `/api/users/*` -> Auth-Service (`3001`)
 - `/api/servers/*`, `/api/channels/*`, `/api/admin/servers` -> Room-Service (`3003`)
-- `/api/rooms/*`, `/api/admin/rooms/*` -> Room-Service (`3003`), transition vers les serveurs (à retirer)
 - `/api/internal/*` -> **jamais relayé** (échanges entre microservices uniquement)
 - `/api/messages/*` -> Message-Service (`3004`)
 - `/api/config-utilisateur/*` -> User-Config-Service (`3005`), après validation du Bearer auprès d’Auth
