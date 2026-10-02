@@ -34,6 +34,7 @@ La configuration complète, les routes, les exemples et les procédures Node/Rus
 
 ```bash
 npm ci
+npm audit --audit-level=high
 npm run lint
 npm test -- --runInBand
 npm run test:cov -- --runInBand
