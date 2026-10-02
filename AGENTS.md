@@ -59,10 +59,13 @@ Les recommandations de revue volontairement non appliquées et leur justificatio
 - Le rate limit est en mémoire, par instance. Avec plusieurs instances du Gateway, chacune a ses propres compteurs; un rate limit distribué exigerait un store partagé (Redis), hors du périmètre de ce dépôt (règle 8).
 - `PROXY_TIMEOUT_MS` n'est pas un budget global : une requête avec corps peut cumuler réception et appel amont; User-Config peut aussi cumuler la validation Auth (voir `docs/DECISIONS.md`, D12).
 
+**Audit des dépendances** : le CI lance `npm audit --audit-level=high` (dépendances de dev comprises). Si un avis `high` ou `critical` sans correctif compatible le bloque, forcer une version corrigée par un `overrides` ciblé dans `package.json` si elle existe ; sinon consigner l'exception (paquet, avis, raison, condition de retrait). Ne pas retirer ni affaiblir l'étape.
+
 ## Tests obligatoires avant PR
 
 ```bash
 npm ci
+npm audit --audit-level=high
 npm run lint
 npm test
 npm run test:cov
