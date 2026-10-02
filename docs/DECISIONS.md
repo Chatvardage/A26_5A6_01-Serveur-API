@@ -225,3 +225,19 @@ Ces points ont été soulevés par des revues automatiques puis **infirmés par 
 - Les deux routes coûteuses sont déjà limitées; doubler au plus le nombre d'opérations possibles par fenêtre est un compromis assumé pour éviter ce couplage.
 
 **À revoir si** : des métriques montrent une saturation Argon2 coordonnée sur les deux routes. Envisager alors des quotas séparés plus bas ou un second plafond agrégé.
+
+---
+
+## D15 — L'audit npm du CI couvre les dépendances de dev et reste bloquant
+
+**Recommandation reçue** : limiter `npm audit` aux dépendances de production (`--omit=dev`), ou le rendre non bloquant (`|| true`, `continue-on-error`) pour éviter qu'un avis sans correctif amont bloque le CI.
+
+**Décision** : non appliquée.
+
+**Justification** :
+
+- Une vulnérabilité `high` dans une dépendance de dev est déjà passée inaperçue dans le Dashboard (`minimatch` 9.0.3 épinglé par `@typescript-eslint/typescript-estree` 6.x : GHSA-3ppc-4f35-3m26, GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74), précisément parce que son CI omettait les dépendances de dev.
+- Un audit non bloquant ne serait pas lu.
+- Un avis sans correctif se traite au cas par cas : `overrides` ciblé vers une version corrigée, sinon exception consignée ici (paquet, avis, raison, condition de retrait).
+
+**À revoir si** : un avis `high` sans correctif ni `overrides` possible, sur un outil de dev uniquement, bloque le CI plus d'une semaine.
