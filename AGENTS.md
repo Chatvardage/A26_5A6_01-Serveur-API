@@ -2,7 +2,7 @@
 
 ## Mission
 
-Ce dépôt est le **Serveur-API / API Gateway** de Chatvardage pour le Contrôle 2 du cours `420-5A6-ST – A26`.
+Ce dépôt est le **Serveur-API / API Gateway** de Chatvardage.
 
 Il constitue le point d'entrée du Frontend Electron; le Dashboard appelle les services directement. Il ne possède aucune donnée métier et ne doit pas dupliquer la logique des microservices.
 
@@ -92,6 +92,6 @@ Le Gateway écoute sur `3000`. Les services internes peuvent rester liés à `12
 
 Tout changement de route, variable d'environnement, timeout, CORS, rate limit ou comportement de proxy doit mettre à jour `README.md`, `.env.example`, `docs/API.md` et ce fichier si la règle de travail change. Toute recommandation de revue écartée doit être ajoutée à `docs/DECISIONS.md` avec sa justification.
 
-## Documentation centrale du contrôle 2
+## Documentation centrale
 
-Infra est la référence du démarrage complet, des architectures, contrats et scénarios de remise. Le README local décrit le dépôt et ses commandes; les guides détaillés sont dans `A26_5A6_01-Infra/docs/`. Toute modification de contrat doit mettre à jour la référence centrale et ses liens. Mobile relève du contrôle 3.
+Infra est la référence du démarrage complet, des architectures, contrats et scénarios de validation. Le README local décrit le dépôt et ses commandes; les guides détaillés sont dans `A26_5A6_01-Infra/docs/`. Toute modification de contrat doit mettre à jour la référence centrale et ses liens.
