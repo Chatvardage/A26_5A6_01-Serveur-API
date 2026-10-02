@@ -236,8 +236,8 @@ Ces points ont été soulevés par des revues automatiques puis **infirmés par 
 
 **Justification** :
 
-- Une vulnérabilité `high` dans une dépendance de dev est déjà passée inaperçue dans le Dashboard (`minimatch` via `@typescript-eslint`), précisément parce que son CI omettait les dépendances de dev.
+- Une vulnérabilité `high` dans une dépendance de dev est déjà passée inaperçue dans le Dashboard (`minimatch` 9.0.3 épinglé par `@typescript-eslint/typescript-estree` 6.x : GHSA-3ppc-4f35-3m26, GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74), précisément parce que son CI omettait les dépendances de dev.
 - Un audit non bloquant ne serait pas lu.
 - Un avis sans correctif se traite au cas par cas : `overrides` ciblé vers une version corrigée, sinon exception consignée ici (paquet, avis, raison, condition de retrait).
 
-**À revoir si** : des avis `high` sans correctif sur des outils de dev bloquent le CI de façon répétée.
+**À revoir si** : un avis `high` sans correctif ni `overrides` possible, sur un outil de dev uniquement, bloque le CI plus d'une semaine.
