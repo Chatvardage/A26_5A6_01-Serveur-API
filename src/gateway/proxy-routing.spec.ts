@@ -51,9 +51,11 @@ describe('proxy routing', () => {
     expect(resolveUpstream(pathname)).toBeNull();
   });
 
-  it('rate limits only POST login and register', () => {
+  it('rate limits public session routes and password verification', () => {
     expect(isRateLimitedAuthRoute('POST', '/api/auth/login')).toBe(true);
     expect(isRateLimitedAuthRoute('post', '/api/auth/register')).toBe(true);
+    expect(isRateLimitedAuthRoute('POST', '/api/auth/refresh')).toBe(true);
+    expect(isRateLimitedAuthRoute('POST', '/api/auth/logout')).toBe(true);
     expect(isRateLimitedAuthRoute('GET', '/api/auth/login')).toBe(false);
     expect(isRateLimitedAuthRoute('POST', '/api/auth/me')).toBe(false);
     // Vérifient le mot de passe actuel.

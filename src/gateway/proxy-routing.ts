@@ -43,6 +43,7 @@ export function resolveUpstream(pathname: string): UpstreamService | null {
  * connexion, inscription, et modification ou suppression de son compte, qui
  * exigent le mot de passe actuel — sans limite, un jeton volé permettait de
  * le deviner par essais successifs.
+ * Les appels publics refresh/logout avec token opaque sont également limités.
  */
 export function isRateLimitedAuthRoute(
   method: string,
@@ -50,7 +51,12 @@ export function isRateLimitedAuthRoute(
 ): boolean {
   const verbe = method.toUpperCase();
   if (verbe === 'POST') {
-    return pathname === '/api/auth/login' || pathname === '/api/auth/register';
+    return [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/refresh',
+      '/api/auth/logout',
+    ].includes(pathname);
   }
   return (
     (verbe === 'PATCH' || verbe === 'DELETE') && pathname === '/api/auth/me'

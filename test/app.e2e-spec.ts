@@ -252,6 +252,28 @@ describe('Serveur-API (e2e)', () => {
     });
   });
 
+  it.each(['/api/auth/refresh', '/api/auth/logout'])(
+    'forwards public session operation %s without credentials in the URL',
+    async (path) => {
+      const body = { refresh_token: 'opaque-test-fixture' };
+      const response = await fetch(`${gatewayUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('X-RateLimit-Limit')).toBe('50');
+      const result = (await response.json()) as {
+        method: string;
+        url: string;
+        body: string;
+      };
+      expect(result.method).toBe('POST');
+      expect(result.url).toBe(path);
+      expect(JSON.parse(result.body)).toEqual(body);
+    },
+  );
+
   it('authenticates and forwards User-Config with a trusted user id', async () => {
     const response = await fetch(`${gatewayUrl}/api/config-utilisateur`, {
       headers: {
