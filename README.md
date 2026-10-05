@@ -50,3 +50,11 @@ Les migrations appartiennent à ce dépôt (`prisma/` lorsqu’applicable); Infr
 - [API et événements](https://github.com/Chatvardage/A26_5A6_01-Infra/blob/main/docs/api/README.md)
 - [Scénario de validation](https://github.com/Chatvardage/A26_5A6_01-Infra/blob/main/docs/validation.md)
 - [Versions et publication](https://github.com/Chatvardage/A26_5A6_01-Infra/blob/main/docs/versions.md)
+
+## Sessions mobiles
+
+`POST /api/auth/refresh` et `POST /api/auth/logout` sont relayés vers Auth-Service
+avec le corps JSON intact, sans Bearer obligatoire. Ils utilisent le quota Auth
+par IP et route comme login/register. Aucun changement de variable d'environnement
+n'est nécessaire. Le Gateway ne gère ni tokens ni sessions dans une base.
+Voir le [contrat central](../A26_5A6_01-Infra/docs/api/authentification.md#sessions-renouvelables--register-login-refresh-et-logout).

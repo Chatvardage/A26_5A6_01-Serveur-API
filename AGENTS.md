@@ -98,3 +98,9 @@ Tout changement de route, variable d'environnement, timeout, CORS, rate limit ou
 ## Documentation centrale
 
 Infra est la référence du démarrage complet, des architectures, contrats et scénarios de validation. Le README local décrit le dépôt et ses commandes; les guides détaillés sont dans `A26_5A6_01-Infra/docs/`. Toute modification de contrat doit mettre à jour la référence centrale et ses liens.
+
+### Extension des sessions mobiles
+
+Les routes publiques `/api/auth/refresh` et `/api/auth/logout` font partie de
+`isRateLimitedAuthRoute`. Elles sont relayées à Auth avec le JSON intact et ne
+nécessitent pas de Bearer (le token opaque est dans le corps).

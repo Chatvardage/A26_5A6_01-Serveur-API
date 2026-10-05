@@ -241,3 +241,11 @@ Ces points ont été soulevés par des revues automatiques puis **infirmés par 
 - Un avis sans correctif se traite au cas par cas : `overrides` ciblé vers une version corrigée, sinon exception consignée ici (paquet, avis, raison, condition de retrait).
 
 **À revoir si** : un avis `high` sans correctif ni `overrides` possible, sur un outil de dev uniquement, bloque le CI plus d'une semaine.
+
+## D16 — Quota sur refresh et logout
+
+Les nouvelles routes refresh/logout présentent un token opaque dans le corps,
+sans Bearer. Elles entrent donc dans la liste des appels publics limités (règle 6),
+avec un quota indépendant par IP et route. D7 ne concerne pas ces routes : le
+refresh actuel n'est pas une route authentifiée par Bearer. Le Gateway transmet
+le contrat intact et Auth reste la source de vérité.
