@@ -2,6 +2,8 @@
 
 La référence est maintenue dans [Infra](https://github.com/Chatvardage/A26_5A6_01-Infra/blob/main/docs/api/gateway.md). Mettre cette référence à jour avec le code du service.
 
+`GET /api/messages/search/summary?q=<texte>` est relayé vers Message-Service par la famille `/api/messages/*` existante. Il exige un Bearer et renvoie les comptes complets par interlocuteur et par serveur / salon lisible, sans contenu de message. Les groupes à zéro sont omis. Le contrat additif et le parcours mobile sont décrits dans [Infra : résumé de recherche](https://github.com/Chatvardage/A26_5A6_01-Infra/blob/main/docs/api/recherche-resume.md). Aucun changement du proxy ni de la recherche paginée existante.
+
 Les routes de session `POST /api/auth/refresh` et `POST /api/auth/logout` sont
 relayées telles quelles et soumises au quota Auth. Leur corps contient un
 `refresh_token` opaque; aucun token ne passe dans l'URL.
