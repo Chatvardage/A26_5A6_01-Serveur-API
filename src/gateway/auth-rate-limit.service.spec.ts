@@ -1,4 +1,7 @@
-import { AuthRateLimitService } from './auth-rate-limit.service';
+import {
+  AuthRateLimitService,
+  MAX_RATE_LIMIT_BUCKETS,
+} from './auth-rate-limit.service';
 import { GatewayConfigService } from './gateway-config.service';
 
 describe('AuthRateLimitService', () => {
@@ -10,6 +13,18 @@ describe('AuthRateLimitService', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
+  });
+
+  it('bounds memory without resetting existing limits and frees expired capacity', () => {
+    const service = new AuthRateLimitService(config);
+    for (let i = 0; i < MAX_RATE_LIMIT_BUCKETS; i += 1) {
+      service.consume(String(i), 1000);
+    }
+    expect(service.consume('new', 1100).allowed).toBe(false);
+    expect(service.consume('0', 1100).allowed).toBe(true);
+    expect(service.consume('0', 1200).allowed).toBe(false);
+    expect(service.consume('new', 2000).allowed).toBe(true);
+    service.onModuleDestroy();
   });
 
   it('uses Date.now when no timestamp is supplied', () => {

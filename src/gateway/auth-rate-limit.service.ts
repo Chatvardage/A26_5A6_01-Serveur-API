@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { GatewayConfigService } from './gateway-config.service';
 
+export const MAX_RATE_LIMIT_BUCKETS = 10_000;
+
 interface RateLimitBucket {
   count: number;
   resetAt: number;
@@ -35,6 +37,21 @@ export class AuthRateLimitService implements OnModuleDestroy {
     const existing = this.buckets.get(key);
     const windowMs = this.config.authRateLimitWindowMs;
     const limit = this.config.authRateLimitMax;
+
+    if (existing === undefined && this.buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+      this.cleanupExpiredBuckets(now);
+      if (this.buckets.size >= MAX_RATE_LIMIT_BUCKETS) {
+        // Ne pas évincer un compteur actif : changer d'adresse ne réinitialise
+        // pas la protection, et la mémoire reste bornée sous forte charge.
+        return {
+          allowed: false,
+          limit,
+          remaining: 0,
+          resetAt: now + windowMs,
+          retryAfterSeconds: Math.max(1, Math.ceil(windowMs / 1000)),
+        };
+      }
+    }
 
     const bucket =
       existing === undefined || existing.resetAt <= now
