@@ -58,3 +58,9 @@ avec le corps JSON intact, sans Bearer obligatoire. Ils utilisent le quota Auth
 par IP et route comme login/register. Aucun changement de variable d'environnement
 n'est nécessaire. Le Gateway ne gère ni tokens ni sessions dans une base.
 Voir le [contrat central](../A26_5A6_01-Infra/docs/api/authentification.md#sessions-renouvelables--register-login-refresh-et-logout).
+
+## Renforcement sécurité — 9 octobre 2026
+
+La limitation des connexions conserve au maximum 10 000 adresses. Après nettoyage des fenêtres expirées, une nouvelle adresse reçoit HTTP 429 si la capacité reste pleine; les fenêtres actives ne sont pas évincées pour contourner la limite. Avec plusieurs instances, prévoir une limitation partagée au reverse proxy.
+
+Les dépendances compatibles sont mises à jour; l'override YAML concerne seulement `@istanbuljs/load-nyc-config`. npm/npx sont retirés de l'image finale après installation. Infra publie désormais ce service sur `127.0.0.1` par défaut; `API_BIND_ADDRESS` permet une ouverture explicite en développement. Voir le rapport global dans `../A26_5A6_01-Infra/docs/audit-securite-2026-10-09.md`.

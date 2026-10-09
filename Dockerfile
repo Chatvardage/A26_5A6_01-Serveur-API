@@ -15,6 +15,9 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --chown=node:node --from=build /app/dist ./dist
+# Les migrations utilisent le CLI local : aucun gestionnaire npm au runtime.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=60s --start-interval=2s \
